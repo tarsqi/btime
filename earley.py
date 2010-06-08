@@ -104,7 +104,7 @@ class State(object):
         return self.dot == len(self.rule)
 
     def parse_tree(self):
-        return (unicode(self.rule.lhs),
+        return (self.rule.lhs,
                 [x.parse_tree() if isinstance(x, State) else x
                  for x in self.matched])
 
