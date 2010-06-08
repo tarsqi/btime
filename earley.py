@@ -38,12 +38,12 @@ class Regexp(Terminal):
 class Production(object):
     """A production rule consists of a left-hand side (LHS) and a
     right-hand side (RHS). A context-free production will have a single
-    nonterminal on the LHS. The RHS is a designator for a list of terminals
-    and nonterminals. Instances should be treated as immutable."""
+    nonterminal on the LHS. The RHS is a designator for a sequence of
+    terminals and nonterminals. Instances should be treated as immutable."""
 
     def __init__(self, lhs, rhs):
         self.lhs = lhs
-        self.rhs = tuple(rhs) if isinstance(rhs, list) else (rhs,)
+        self.rhs = tuple(rhs) if isinstance(rhs, (list, tuple)) else (rhs,)
 
     def __len__(self):
         return len(self.rhs)
@@ -69,21 +69,17 @@ class Production(object):
         __str__ = __unicode__
 
 class Grammar(object):
-    """A grammar is a collection of production rules. The productions are
-    specified as a dictionary whose keys are the nonterminals, and whose
-    values are (designators for) tuples consisting of alternative
-    right-hand sides."""
+    """A grammar is a collection of production rules and a designated start
+    symbol. The list of productions is stored in a dictionary indexed by LHS."""
 
     def __init__(self, productions, start="S"):
         self.start = start
         self.productions = {}
-        for lhs, rhs in productions.items():
-            if isinstance(rhs, tuple):
-                self.productions[lhs] = tuple(Production(lhs, alt)
-                                              for alt in rhs)
+        for rule in productions:
+            if rule.lhs in self.productions:
+                self.productions[rule.lhs].append(rule)
             else:
-                # Only a single RHS; coerce it to a singleton tuple.
-                self.productions[lhs] = (Production(lhs, rhs),)
+                self.productions[rule.lhs] = [rule]
 
     def __getitem__(self, lhs):
         return self.productions[lhs]
@@ -211,15 +207,23 @@ def parse(input, grammar):
     return Parser(grammar).parse(input)
 
 if __name__ == "__main__":
+    def make_productions(spec):
+        """Given a specification of grammar rules as a dictionary, produce
+        the corresponding productions. Keys are the LHS of the rules; values
+        are either a list of alternative RHS, or a single RHS."""
+        for lhs, rhs in spec.items():
+            if isinstance(rhs, list):
+                for alt in rhs:
+                    yield Production(lhs, alt)
+            else:
+                yield Production(lhs, rhs)
+
     # This example is from the Wikipedia entry for "Earley parser".
-    grammar = Grammar({
-        "P": "S",
-        "S": (["S", Literal("+"), "M"],
-              "M"),
-        "M": (["M", Literal("*"), "T"],
-              "T"),
-        "T": Regexp("^\d+$", "number")
-    }, start="P")
+    grammar = Grammar(make_productions({"P": "S",
+                                        "S": [("S", Literal("+"), "M"), "M"],
+                                        "M": [("M", Literal("*"), "T"), "T"],
+                                        "T": Regexp("^\d+$", "number")}),
+                      start="P")
     parser = Parser(grammar)
     parser.parse("2+3*4")
     parser.pprint()
