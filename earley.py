@@ -104,7 +104,7 @@ class State(object):
         return self.dot == len(self.rule)
 
     def parse_tree(self):
-        return (self.rule.lhs,
+        return (self.rule,
                 [x.parse_tree() if isinstance(x, State) else x
                  for x in self.matched])
 
@@ -171,7 +171,7 @@ class Parser(object):
             self.push_state(state.advance(token), i+1)
 
     def parse(self, input):
-        self.chart = [[State(Production(self.start, grammar.start), 0)]]
+        self.chart = [[State(Production(self.start, self.grammar.start), 0)]]
 
         # We have n+1 state sets to process, so we tack on an extra dummy
         # token to the input.
@@ -193,8 +193,9 @@ class Parser(object):
         for i in reversed(range(len(self))):
             for state in self[i]:
                 if state.rule.lhs is self.start and \
-                   state.iscomplete() and state.start == 0:
-                    yield state
+                   state.iscomplete() and \
+                   state.start == 0:
+                    yield state.matched[0] # skip inserted start rule
 
     def pprint(self):
         for i in range(len(self)):
