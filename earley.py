@@ -45,8 +45,16 @@ class Production(object):
         self.lhs = lhs
         self.rhs = rhs if isinstance(rhs, list) else [rhs]
 
+    def __len__(self):
+        return len(self.rhs)
+
     def __eq__(self, other):
-        return self.lhs == other.lhs and self.rhs == other.rhs
+        return (isinstance(other, self.__class__) and
+                self.lhs == other.lhs and
+                self.rhs == other.rhs)
+
+    def __ne__(self, other):
+        return not (self == other)
 
     def __repr__(self):
         return "Production(%s, %s)" % (self.lhs, self.rhs)
@@ -93,7 +101,7 @@ class State(object):
                      self.matched + [matched])
 
     def iscomplete(self):
-        return self.dot == len(self.rule.rhs)
+        return self.dot == len(self.rule)
 
     def parse_tree(self):
         return (unicode(self.rule.lhs),
@@ -101,16 +109,17 @@ class State(object):
                  for x in self.matched])
 
     def __eq__(self, other):
-        return self.rule is other.rule and \
-               self.start is other.start and \
-               self.dot == other.dot
+        return (isinstance(other, self.__class__) and
+                self.rule == other.rule and
+                self.start == other.start and
+                self.dot == other.dot)
 
     def __ne__(self, other):
         return not (self == other)
 
     def __unicode__(self):
         s = u"[%s \u2192" % self.rule.lhs
-        for i in range(len(self.rule.rhs)):
+        for i in range(len(self.rule)):
             # We should use an interpunct (U+00B7) for the dot, but those
             # tend to be a little light, so we'll use a bullet instead.
             s += u"%s%s" % (u"\u2022" if i == self.dot else " ",
