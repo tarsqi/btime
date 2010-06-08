@@ -35,10 +35,11 @@ class Regexp(Terminal):
     def __str__(self):
         return self.name
 
-class Rule(object):
-    """A rule consists of a left-hand side (LHS) and a right-hand side (RHS).
-    The LHS is the name of the rule. The RHS is a designator for a list of
-    terminals and non-terminals."""
+class Production(object):
+    """A production rule consists of a left-hand side (LHS) and a
+    right-hand side (RHS). A context-free production will have a single
+    nonterminal on the LHS. The RHS is a designator for a list of
+    terminals and nonterminals."""
 
     def __init__(self, lhs, rhs):
         self.lhs = lhs
@@ -48,7 +49,7 @@ class Rule(object):
         return self.lhs == other.lhs and self.rhs == other.rhs
 
     def __repr__(self):
-        return "Rule(%s, %s)" % (self.lhs, self.rhs)
+        return "Production(%s, %s)" % (self.lhs, self.rhs)
 
     def __unicode__(self):
         return u"%s \u2192 %s" % (self.lhs, u" ".join(map(unicode, self.rhs)))
@@ -57,23 +58,24 @@ class Rule(object):
         __str__ = __unicode__
 
 class Grammar(object):
-    """A grammar is a collection of rules, one of which is designated as the
-    start rule. The rules are specified as a dictionary whose keys are the
-    names of rules, and whose values are (designators for) tuples consisting
-    of alternative right-hand sides."""
+    """A grammar is a collection of production rules. The productions are
+    specified as a dictionary whose keys are the nonterminals, and whose
+    values are (designators for) tuples consisting of alternative
+    right-hand sides."""
 
-    def __init__(self, rules, start="S"):
+    def __init__(self, productions, start="S"):
         self.start = start
-        self.rules = {}
-        for lhs, rhs in rules.items():
+        self.productions = {}
+        for lhs, rhs in productions.items():
             if isinstance(rhs, tuple):
-                self.rules[lhs] = tuple(Rule(lhs, alt) for alt in rhs)
+                self.productions[lhs] = tuple(Production(lhs, alt)
+                                              for alt in rhs)
             else:
                 # Only a single RHS; coerce it to a singleton tuple.
-                self.rules[lhs] = (Rule(lhs, rhs),)
+                self.productions[lhs] = (Production(lhs, rhs),)
 
     def __getitem__(self, lhs):
-        return self.rules[lhs]
+        return self.productions[lhs]
 
 class State(object):
     def __init__(self, rule, start, dot=0, matched=[]):
@@ -123,7 +125,7 @@ class State(object):
 class Parser(object):
     """An Earley parser for a given context-free grammar."""
 
-    class StartName(object):
+    class StartSymbol(object):
         """We'll need a new start rule for the initial state set; using a
         new instance of a class like this ensures that there will never be
         a conflict with an existing grammar."""
@@ -131,7 +133,7 @@ class Parser(object):
 
     def __init__(self, grammar):
         self.grammar = grammar
-        self.start = self.StartName()
+        self.start = self.StartSymbol()
 
     def __getitem__(self, i):
         if i == len(self.chart):
@@ -160,7 +162,7 @@ class Parser(object):
             self.push_state(state.advance(token), i+1)
 
     def parse(self, input):
-        self.chart = [[State(Rule(self.start, grammar.start), 0)]]
+        self.chart = [[State(Production(self.start, grammar.start), 0)]]
 
         # We have n+1 state sets to process, so we tack on an extra dummy
         # token to the input.
