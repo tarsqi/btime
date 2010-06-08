@@ -38,12 +38,12 @@ class Regexp(Terminal):
 class Production(object):
     """A production rule consists of a left-hand side (LHS) and a
     right-hand side (RHS). A context-free production will have a single
-    nonterminal on the LHS. The RHS is a designator for a list of
-    terminals and nonterminals."""
+    nonterminal on the LHS. The RHS is a designator for a list of terminals
+    and nonterminals. Instances should be treated as immutable."""
 
     def __init__(self, lhs, rhs):
         self.lhs = lhs
-        self.rhs = rhs if isinstance(rhs, list) else [rhs]
+        self.rhs = tuple(rhs) if isinstance(rhs, list) else (rhs,)
 
     def __len__(self):
         return len(self.rhs)
@@ -55,6 +55,9 @@ class Production(object):
 
     def __ne__(self, other):
         return not (self == other)
+
+    def __hash__(self):
+        return hash(self.lhs) ^ hash(self.rhs)
 
     def __repr__(self):
         return "Production(%s, %s)" % (self.lhs, self.rhs)
