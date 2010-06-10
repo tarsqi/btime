@@ -5,6 +5,7 @@ __author__ = "Alex Plotnick <plotnick@cs.brandeis.edu>"
 import itertools
 import re
 import sys
+from types import FunctionType
 
 class Terminal(object):
     """Terminal objects are used to match input tokens. Subclasses should
@@ -83,6 +84,42 @@ class Grammar(object):
 
     def __getitem__(self, lhs):
         return self.productions[lhs]
+
+def default_action(rhs):
+    return rhs[0]
+
+class AttributeGrammar(Grammar):
+    def __init__(self, productions_and_actions, start="S"):
+        productions = []
+        self.actions = {}
+        for x in productions_and_actions:
+            if isinstance(x, tuple) and len(x) == 2:
+                rule, action = x
+                productions.append(rule)
+                if action:
+                    assert isinstance(action, FunctionType), \
+                        "action must be a function"
+                    self.actions[rule] = action
+            elif isinstance(x, Production):
+                productions.append(x)
+            else:
+                raise ValueError("Invalid production/action pair")
+        super(AttributeGrammar, self).__init__(productions, start)
+
+    def action(self, production):
+        return self.actions.get(production, default_action)
+
+    def eval(self, parse):
+        if isparsetree(parse):
+            rule, children = parse
+            return self.action(rule)(map(lambda x: self.eval(x), children))
+        else:
+            return parse
+
+def isparsetree(x):
+    return (isinstance(x, tuple) and
+            len(x) == 2 and
+            isinstance(x[0], Production))
 
 class State(object):
     def __init__(self, rule, start, dot=0, matched=[]):
