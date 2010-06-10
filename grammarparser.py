@@ -53,7 +53,7 @@ class GrammarSpecTokenizer(object):
         def getnext():
             token = self.generator.next()
             type, value = token[:2]
-            if type in (INDENT, DEDENT):
+            if type in (INDENT, DEDENT, NL, COMMENT):
                 return getnext() # don't care
             elif type == OP:
                 if value in "([{":
@@ -82,8 +82,6 @@ def action(expr):
 grammar_spec_grammar = AttributeGrammar([
       (Production("grammar", ("prodlist", PyTok(ENDMARKER))),
        lambda rhs: rhs[0] if isinstance(rhs[0], list) else [rhs[0]]),
-      (Production("prodlist", (PyTok(NL), "prodlist")),
-       lambda rhs: rhs[1]),
       (Production("prodlist", ("prodlist", "prod", PyTok(NEWLINE))),
        lambda rhs: rhs[0] + rhs[1]),
       (Production("prodlist", ("prod", PyTok(NEWLINE)))),
