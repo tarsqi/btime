@@ -127,17 +127,13 @@ class State(object):
         self.start = start
         self.dot = dot
         self.matched = matched
-
-    def peek(self):
-        return self.rule.rhs[self.dot]
+        self.complete = (dot == len(rule))
+        self.next = rule.rhs[dot] if not self.complete else None
 
     def advance(self, matched):
-        assert not self.iscomplete(), "can't advance a complete state"
+        assert not self.complete, "can't advance a complete state"
         return State(self.rule, self.start, self.dot+1,
                      self.matched + [matched])
-
-    def iscomplete(self):
-        return self.dot == len(self.rule)
 
     def parse_tree(self):
         return (self.rule,
@@ -145,8 +141,9 @@ class State(object):
                  for x in self.matched])
 
     def __eq__(self, other):
-        return (isinstance(other, self.__class__) and
-                self.rule == other.rule and
+        # N.B.: We should really say self.rule == other.rule, but this
+        # method is part of the inner loop, and needs to be fast.
+        return (self.rule is other.rule and
                 self.start == other.start and
                 self.dot == other.dot)
 
@@ -160,7 +157,7 @@ class State(object):
             # tend to be a little light, so we'll use a bullet instead.
             s += u"%s%s" % (u"\u2022" if i == self.dot else " ",
                             self.rule.rhs[i])
-        if self.iscomplete(): s += u"\u2022"
+        if self.complete: s += u"\u2022"
         s += u", %d]" % self.start
         return s
 
@@ -181,9 +178,13 @@ class Parser(object):
         self.start = self.StartSymbol()
 
     def __getitem__(self, i):
-        if i == len(self.chart):
+        try:
+            return self.chart[i]
+        except IndexError:
+            # It's not worth checking that i == len(self.chart); we'll just
+            # assume it. If it's not, another IndexError will be raised.
             self.chart.append([])
-        return self.chart[i]
+            return self.chart[i]
 
     def __len__(self):
         return len(self.chart)
@@ -195,15 +196,22 @@ class Parser(object):
 
     def complete(self, state, i):
         for prev in self[state.start][:]:
-            if not prev.iscomplete() and prev.peek() == state.rule.lhs:
+            if not prev.complete and prev.next == state.rule.lhs:
                 self.push_state(prev.advance(state), i)
 
     def predict(self, state, i):
-        for rule in self.grammar[state.peek()]:
-            self.push_state(State(rule, i), i)
+        for rule in self.grammar[state.next]:
+            # We could just use push_state here, but this is part of the
+            # inner loop, and doing this fast scan over the state set makes
+            # a huge difference in performance.
+            for state in self[i]:
+                if state.rule is rule and state.start == i:
+                    break
+            else:
+                self.push_state(State(rule, i), i)
 
     def scan(self, state, i, token):
-        if state.peek().match(token):
+        if state.next.match(token):
             self.push_state(state.advance(token), i+1)
 
     def parse(self, input):
@@ -218,9 +226,9 @@ class Parser(object):
                 # new state is added via push_state.
                 self.more = False
                 for state in self[i][:]:
-                    if state.iscomplete():
+                    if state.complete:
                         self.complete(state, i)
-                    elif isinstance(state.peek(), Terminal):
+                    elif isinstance(state.next, Terminal):
                         self.scan(state, i, token)
                     else:
                         self.predict(state, i)
@@ -229,7 +237,7 @@ class Parser(object):
         for i in reversed(range(len(self))):
             for state in self[i]:
                 if state.rule.lhs is self.start and \
-                   state.iscomplete() and \
+                   state.complete and \
                    state.start == 0:
                     yield state.matched[0] # skip inserted start rule
 
