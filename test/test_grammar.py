@@ -15,7 +15,7 @@ T -> Regexp(r"^\d+$", "number") { int(_[0]) }
 def parse_expr(expr, grammar=parse_grammar_spec(arith_expr_grammar, "P")):
     parser = Parser(grammar)
     parser.parse(expr)
-    return parser.grammar.eval(parser.completed_parses().next().parse_tree())
+    return parser.grammar.eval(parser.parses().next())
 
 class ParseExprTest(unittest.TestCase):
     def test_expr(self):
@@ -74,7 +74,7 @@ thousands -> small "thousand" { _[0] * 1000 }
 def parse_number(number, grammar=parse_grammar_spec(number_grammar, "number")):
     parser = Parser(grammar)
     parser.parse(number)
-    return parser.grammar.eval(parser.completed_parses().next().parse_tree())
+    return parser.grammar.eval(parser.parses().next())
 
 class ParseNumberTest(unittest.TestCase):
     def assertNumber(self, number, value):

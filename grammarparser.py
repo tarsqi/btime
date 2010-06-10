@@ -117,5 +117,4 @@ grammar_spec_grammar = AttributeGrammar([
 
 def parse_grammar_spec(spec, start, parser=Parser(grammar_spec_grammar)):
     parser.parse(GrammarSpecTokenizer(spec))
-    tree = parser.completed_parses().next().parse_tree()
-    return AttributeGrammar(parser.grammar.eval(tree), start)
+    return AttributeGrammar(parser.grammar.eval(parser.parses().next()), start)

@@ -21,10 +21,10 @@ class State(object):
         return State(self.rule, self.start, self.dot+1,
                      self.matched + [matched])
 
-    def parse_tree(self):
-        return ParseTree(self.rule,
-                         [x.parse_tree() if isinstance(x, State) else x
-                          for x in self.matched])
+    def parse_tree(self, tree=ParseTree):
+        return tree(self.rule,
+                    [x.parse_tree(tree) if isinstance(x, State) else x
+                     for x in self.matched])
 
     def __eq__(self, other):
         # N.B.: We should really say self.rule == other.rule, but this
@@ -120,13 +120,16 @@ class Parser(object):
                     else:
                         self.predict(state, i)
 
-    def completed_parses(self):
+    def parses(self, tree=ParseTree):
+        """Yield the completed parse trees."""
         for i in reversed(range(len(self))):
             for state in self[i]:
                 if state.rule.lhs is self.start and \
                    state.complete and \
                    state.start == 0:
-                    yield state.matched[0] # skip inserted start rule
+                    # We skip the inserted start rule by grabbing the first
+                    # child matched in the start state.
+                    yield state.matched[0].parse_tree(tree)
 
     def pprint(self):
         for i in range(len(self)):
@@ -138,5 +141,4 @@ class Parser(object):
 def parse(input, grammar):
     parser = Parser(grammar)
     parser.parse(input)
-    for state in parser.completed_parses():
-        yield state.parse_tree()
+    return parser.parses()
