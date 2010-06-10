@@ -205,10 +205,11 @@ class Parser(object):
             # inner loop, and doing this fast scan over the state set makes
             # a huge difference in performance.
             for state in self[i]:
-                if state.rule is rule and state.start == i:
+                if state.rule is rule and state.start == i and state.dot == 0:
                     break
             else:
-                self.push_state(State(rule, i), i)
+                self[i].append(State(rule, i))
+                self.more = True
 
     def scan(self, state, i, token):
         if state.next.match(token):
@@ -222,8 +223,8 @@ class Parser(object):
         for i, token in enumerate(itertools.chain(input, [None])):
             self.more = True
             while self.more:
-                # The `more' flag will be set to true when and only when a
-                # new state is added via push_state.
+                # The `more' flag will be set to true only when a new state
+                # has been added by the completer, scanner, or predictor.
                 self.more = False
                 for state in self[i][:]:
                     if state.complete:
