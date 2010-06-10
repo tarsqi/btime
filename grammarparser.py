@@ -72,12 +72,14 @@ class GrammarSpecTokenizer(object):
         else:
             return token
 
+class InvalidActionError(Exception):
+    pass
+
 def action(expr):
-    namespace = {}
-    exec compile("def action(_): return (%s)" % expr[1:-1],
-                 "<action>", "exec") in \
-         globals(), namespace
-    return namespace["action"]
+    if not (isinstance(expr, basestring) and
+            GrammarSpecTokenizer.delimiters[expr[0]] == expr[-1]):
+        raise InvalidActionError("invalid action expression '%s'" % expr)
+    return eval(compile("lambda _: %s" % expr[1:-1], "<action>", "eval"))
 
 grammar_spec_grammar = AttributeGrammar([
       (Production("grammar", ("prodlist", PyTok(ENDMARKER))),
