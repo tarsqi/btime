@@ -9,6 +9,7 @@ class TestState(TestCase):
         self.state = State(self.rule, 0)
 
     def test_init(self):
+        """Test Earley state initialization"""
         self.assertEqual(self.state.rule, self.rule)
         self.assertEqual(self.state.start, 0)
         self.assertEqual(self.state.dot, 0)
@@ -17,11 +18,13 @@ class TestState(TestCase):
         self.assertEqual(self.state.next, self.rule.rhs[0])
 
     def test_equal(self):
+        """Test Earley state comparison"""
         other = State(self.rule, 0)
         self.assertEqual(self.state, other)
         self.assertNotEqual(self.state, other.advance("NP"))
 
     def test_advance(self):
+        """Test Earley state advancement"""
         state = self.state.advance("NP")
         self.assertNotEqual(state, self.state)
         self.assertEqual(state.rule, self.rule)
@@ -44,6 +47,7 @@ class TestParser(TestCase):
         self.parser = Parser(self.grammar)
 
     def test_parse(self):
+        """Accept a valid string"""
         input = "ab"
         self.parser.parse(input)
         self.assertEqual(len(self.parser), len(input)+1)
@@ -52,15 +56,16 @@ class TestParser(TestCase):
                          [ParseTree(self.rule, input)])
 
     def test_reject(self):
+        """Reject an invalid string"""
         self.parser.parse("aa")
         self.failIf(list(self.parser.parses()))
 
 def suite():
-    return TestSuite([TestLoader().loadTestsFromTestCase(TestState),
-                      TestLoader().loadTestsFromTestCase(TestParser)])
+    return TestSuite([TestLoader().loadTestsFromTestCase(cls) \
+                          for cls in TestState, TestParser])
+
+def run(runner=TextTestRunner, **args):
+    return runner(**args).run(suite())
 
 if __name__ == "__main__":
-    try:
-        TextTestRunner().run(suite())
-    except SystemExit:
-        pass
+    run(verbosity=2)
