@@ -2,7 +2,6 @@
 
 __author__ = "Alex Plotnick <plotnick@cs.brandeis.edu>"
 
-import itertools
 from StringIO import StringIO
 from tokenize import *
 from tokenize import TokenError
@@ -62,13 +61,16 @@ class GrammarSpecTokenizer(object):
                     if self.delimstack.pop() != value:
                         raise TokenError("improperly nested delimiters")
             return token
-        def getdelimitedtoks():
+
+        def getdelimitedtoks(delimiter):
+            yield delimiter[:2]
             while self.delimstack:
-                yield getnext()
+                yield getnext()[:2]
+
         token = getnext()
         if self.delimstack:
             return (self.delimtypes[token[1]],
-                    untokenize(itertools.chain([token], getdelimitedtoks())))
+                    untokenize(tuple(getdelimitedtoks(token))))
         else:
             return token
 
