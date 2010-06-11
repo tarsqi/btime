@@ -115,6 +115,8 @@ grammar_spec_grammar = AttributeGrammar([
        lambda rhs: action(rhs[0][1]))],
     start="grammar")
 
-def parse_grammar_spec(spec, start, parser=Parser(grammar_spec_grammar)):
+def parse_grammar_spec(spec, start,
+                       grammar_class=AttributeGrammar,
+                       parser=Parser(grammar_spec_grammar)):
     parser.parse(GrammarSpecTokenizer(spec))
-    return AttributeGrammar(parser.grammar.eval(parser.parses().next()), start)
+    return grammar_class(parser.grammar.eval(parser.parses().next()), start)
