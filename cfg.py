@@ -121,3 +121,8 @@ class ParseTree(object):
 
     def __getitem__(self, index):
         return self.children[index]
+
+    def __eq__(self, other):
+        return (isinstance(other, ParseTree) and
+                self.node == other.node and
+                self.children == other.children)
