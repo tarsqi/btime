@@ -16,10 +16,10 @@ class State(object):
         self.complete = (dot == len(rule))
         self.next = rule.rhs[dot] if not self.complete else None
 
-    def advance(self, matched):
+    def advance(self, match):
         assert not self.complete, "can't advance a complete state"
         return State(self.rule, self.start, self.dot+1,
-                     self.matched + [matched])
+                     self.matched + [match])
 
     def parse_tree(self, tree_class=ParseTree):
         return tree_class(self.rule,
