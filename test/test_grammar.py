@@ -1,4 +1,4 @@
-import unittest
+from unittest import *
 
 from earley import Parser
 from grammarparser import parse_grammar_spec
@@ -17,8 +17,9 @@ def parse_expr(expr, grammar=parse_grammar_spec(arith_expr_grammar, "P")):
     parser.parse(expr)
     return parser.grammar.eval(parser.parses().next())
 
-class ParseExprTest(unittest.TestCase):
+class ParseExprTest(TestCase):
     def test_expr(self):
+        """Parse simple arithmetic expressions"""
         self.assertEqual(parse_expr("2+3*4"), 14)
         self.assertEqual(parse_expr(["20", "+", "5"]), 25)
         self.assertEqual(parse_expr(["17", "*", "2"]), 34)
@@ -76,11 +77,12 @@ def parse_number(number, grammar=parse_grammar_spec(number_grammar, "number")):
     parser.parse(number.replace("-", " ").split(" "))
     return parser.grammar.eval(parser.parses().next())
 
-class ParseNumberTest(unittest.TestCase):
+class ParseNumberTest(TestCase):
     def assertNumber(self, number, value):
         self.assertEqual(parse_number(number), value)
 
     def test_small_numbers(self):
+        """Parse numbers x <= 20"""
         for i, s in enumerate(["zero", "one", "two", "three", "four",
                                "five", "six", "seven", "eight", "nine",
                                "ten", "eleven", "twelve", "thirteen",
@@ -89,6 +91,7 @@ class ParseNumberTest(unittest.TestCase):
             self.assertNumber(s, i)
 
     def test_tens(self):
+        """Parse numbers 20 < x < 100"""
         self.assertNumber("twenty-one", 21)
         self.assertNumber("thirty-two", 32)
         self.assertNumber("forty-three", 43)
@@ -99,6 +102,7 @@ class ParseNumberTest(unittest.TestCase):
         self.assertNumber("ninety-eight", 98)
 
     def test_hundreds(self):
+        """Parse numbers 100 <= x < 1000"""
         self.assertNumber("one hundred", 100)
         self.assertNumber("one hundred ten", 110)
         self.assertNumber("one hundred fourteen", 114)
@@ -111,6 +115,7 @@ class ParseNumberTest(unittest.TestCase):
         self.assertNumber("eighty-four hundred and twelve", 8412)
 
     def test_thousands(self):
+        """Parse numbers 1000 <= x < 1000000"""
         self.assertNumber("one thousand", 1000)
         self.assertNumber("two thousand and one", 2001)
         self.assertNumber("two thousand twelve", 2012)
@@ -119,8 +124,12 @@ class ParseNumberTest(unittest.TestCase):
         self.assertNumber("twelve thousand nine", 12009)
         self.assertNumber("four hundred thousand nine hundred and one", 400901)
 
+def suite():
+    return TestSuite([TestLoader().loadTestsFromTestCase(cls) \
+                          for cls in ParseExprTest, ParseNumberTest])
+
+def run(runner=TextTestRunner, **args):
+    return runner(**args).run(suite())
+
 if __name__ == "__main__":
-    try:
-        unittest.main()
-    except SystemExit:
-        pass
+    run(verbosity=2)
