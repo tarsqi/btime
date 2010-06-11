@@ -73,13 +73,12 @@ thousands -> small "thousand" { _[0] * 1000 }
 
 def parse_number(number, grammar=parse_grammar_spec(number_grammar, "number")):
     parser = Parser(grammar)
-    parser.parse(number)
+    parser.parse(number.replace("-", " ").split(" "))
     return parser.grammar.eval(parser.parses().next())
 
 class ParseNumberTest(unittest.TestCase):
     def assertNumber(self, number, value):
-        self.assertEqual(parse_number(number.replace("-", " ").split(" ")),
-                         value)
+        self.assertEqual(parse_number(number), value)
 
     def test_small_numbers(self):
         for i, s in enumerate(["zero", "one", "two", "three", "four",
