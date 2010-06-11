@@ -117,7 +117,7 @@ class AttributeGrammar(Grammar):
 class ParseTree(object):
     def __init__(self, node, children=None):
         self.node = node
-        self.children = children
+        self.children = list(children) if children else None
 
     def __getitem__(self, index):
         return self.children[index]
