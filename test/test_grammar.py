@@ -1,7 +1,25 @@
+from types import FunctionType
 from unittest import *
 
 from earley import Parser
-from grammarparser import parse_grammar_spec
+from grammarparser import compile_action, parse_grammar_spec
+
+class CompileActionTest(TestCase):
+    def test_expression(self):
+        """Compile a single-expression action"""
+        action = compile_action("{ _ * 2 }")
+        self.failUnless(isinstance(action, FunctionType))
+        self.assertEqual(action(2), 4)
+
+    def test_suite(self):
+        """Compile an action suite"""
+        action = compile_action("{ pass; return _ * 3 }")
+        self.failUnless(isinstance(action, FunctionType))
+        self.assertEqual(action(2), 6)
+
+    def test_syntax_error(self):
+        """Raise syntax error for an invalid action"""
+        self.assertRaises(SyntaxError, lambda: compile_action("{ if: else }"))
 
 # Simple arithmetic expressions (from the Wikipedia entry for "Early Parser").
 arith_expr_grammar = """
@@ -126,7 +144,9 @@ class ParseNumberTest(TestCase):
 
 def suite():
     return TestSuite([TestLoader().loadTestsFromTestCase(cls) \
-                          for cls in ParseExprTest, ParseNumberTest])
+                          for cls in (CompileActionTest,
+                                      ParseExprTest,
+                                      ParseNumberTest)])
 
 def run(runner=TextTestRunner, **args):
     return runner(**args).run(suite())

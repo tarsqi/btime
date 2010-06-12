@@ -77,11 +77,22 @@ class GrammarSpecTokenizer(object):
 class InvalidActionError(Exception):
     pass
 
-def action(expr):
+def compile_action(expr):
     if not (isinstance(expr, basestring) and
-            GrammarSpecTokenizer.delimiters[expr[0]] == expr[-1]):
+            GrammarSpecTokenizer.delimiters.get(expr[0]) == expr[-1]):
         raise InvalidActionError("invalid action expression '%s'" % expr)
-    return eval(compile("lambda _: %s" % expr[1:-1], "<action>", "eval"))
+    try:
+        # We first assume expr is a single Python expression, and use it as
+        # the body of a lambda.
+        return eval(compile("lambda _: %s" % expr[1:-1], "<action>", "eval"))
+    except SyntaxError:
+        # Well, it's not an expression (or at least not a valid one);
+        # we'll assume it's a statement suite, and use it as the body of
+        # a function definition.
+        namespace = {}
+        exec compile("def action(_): %s" % expr[1:-1], "<action>", "exec") in \
+            globals(), namespace
+        return namespace["action"]
 
 grammar_spec_grammar = AttributeGrammar([
       (Production("grammar", ("prodlist", PyTok(ENDMARKER))),
@@ -114,7 +125,7 @@ grammar_spec_grammar = AttributeGrammar([
       (Production("sym", (PyTok(NAME), PyTok(TUPLE))), # funcall
        lambda rhs: eval(rhs[0][1] + rhs[1][1])),
       (Production("action", PyTok(EXPR)),
-       lambda rhs: action(rhs[0][1]))],
+       lambda rhs: compile_action(rhs[0][1]))],
     start="grammar")
 
 def parse_grammar_spec(spec, start,
