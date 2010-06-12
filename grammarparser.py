@@ -9,6 +9,8 @@ from tokenize import TokenError
 from cfg import *
 from earley import Parser
 
+__all__ = ["parse_grammar_spec"]
+
 EXPR = N_TOKENS
 LIST = N_TOKENS + 1
 TUPLE = N_TOKENS + 2
