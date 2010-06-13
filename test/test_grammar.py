@@ -45,8 +45,9 @@ class ParseExprTest(TestCase):
 # A rather larger grammer for English cardinals.
 number_grammar = """
 number -> zero | small | hundreds | thousands
-zero -> "zero" { 0 }
+zero -> Regexp(r"^(zero|oh?|n?[ao]ught)$", "zero") { 0 }
 small -> ones
+    | zero ones { _[1] }
     | teen
     | tens
     | tens ones { _[0] + _[1] }
@@ -80,7 +81,8 @@ tens -> "twenty" { 20 }
 hundreds -> small "hundred" { _[0] * 100 }
     | small "hundred" small { (_[0] * 100) + _[2] }
     | small "hundred" "and" small { (_[0] * 100) + _[3] }
-thousands -> small "thousand" { _[0] * 1000 }
+thousands -> small small { _[0] * 100 + _[1] }
+    | small "thousand" { _[0] * 1000 }
     | small "thousand" small { (_[0] * 1000) + _[2] }
     | small "thousand" "and" small { (_[0] * 1000) + _[3] }
     | small "thousand" hundreds { (_[0] * 1000) + _[2] }
@@ -141,6 +143,15 @@ class ParseNumberTest(TestCase):
         self.assertNumber("six thousand two hundred sixty-eight", 6268)
         self.assertNumber("twelve thousand nine", 12009)
         self.assertNumber("four hundred thousand nine hundred and one", 400901)
+
+    def test_four_digits(self):
+        """Parse four-digit numbers with implicit hundreds"""
+        self.assertNumber("seventeen seventy-six", 1776)
+        self.assertNumber("nineteen oh one", 1901)
+        self.assertNumber("nineteen aught four", 1904)
+        self.assertNumber("nineteen ninety-nine", 1999)
+        self.assertNumber("twenty o six", 2006)
+        self.assertNumber("twenty ten", 2010)
 
 def suite():
     return TestSuite([TestLoader().loadTestsFromTestCase(cls) \
