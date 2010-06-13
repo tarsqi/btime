@@ -133,5 +133,10 @@ grammar_spec_grammar = AttributeGrammar([
 def parse_grammar_spec(spec, start,
                        grammar_class=AttributeGrammar,
                        parser=Parser(grammar_spec_grammar)):
+    """Given a grammar specification and a start symbol, return a new grammar
+    instance. The specification may be either a string or a readline-like
+    function."""
+    assert issubclass(grammar_class, AttributeGrammar), \
+        "Grammar class must be a subclass of AttributeGrammar."
     parser.parse(GrammarSpecTokenizer(spec))
     return grammar_class(parser.grammar.eval(parser.parses().next()), start)
