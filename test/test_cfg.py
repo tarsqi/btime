@@ -19,6 +19,7 @@ class TestRegexp(TestCase):
     def test_mismatch(self):
         """Fail to match a regular expression"""
         self.assertFalse(Literal("foo+").match("fo"))
+        self.assertFalse(Literal("foo+").match(None))
 
 class TestAbbrev(TestCase):
     def setUp(self):

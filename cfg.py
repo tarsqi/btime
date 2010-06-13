@@ -30,7 +30,7 @@ class Regexp(Terminal):
         self.name = name or pattern
 
     def match(self, token):
-        return self.pattern.match(token)
+        return token is not None and self.pattern.match(token)
 
     def __str__(self):
         return self.name
@@ -113,7 +113,7 @@ class AttributeGrammar(Grammar):
             elif isinstance(x, Production):
                 productions.append(x)
             else:
-                raise ValueError("Invalid production/action pair")
+                raise ValueError("Invalid production/action pair: %s" % x)
         super(AttributeGrammar, self).__init__(productions, start)
 
     def action(self, production):
