@@ -35,6 +35,17 @@ class Regexp(Terminal):
     def __str__(self):
         return self.name
 
+class Abbrev(Terminal):
+    def __init__(self, string, n):
+        assert isinstance(string, basestring) and isinstance(n, int) and n > 0
+        self.string = string
+        self.n = n
+
+    def match(self, token):
+        return (token == self.string or
+                (token[0:self.n] == self.string[0:self.n] and
+                 token[self.n:] in (".", "")))
+
 class Production(object):
     """A production rule consists of a left-hand side (LHS) and a
     right-hand side (RHS). A context-free production will have a single
