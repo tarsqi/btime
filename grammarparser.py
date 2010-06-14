@@ -111,7 +111,10 @@ grammar_spec_grammar = AttributeGrammar([
        lambda rhs: rhs[0] if isinstance(rhs[0], list) else [rhs[0]]),
       (Production("prodlist", ("prodlist", "prod", PyTok(NEWLINE))),
        lambda rhs: rhs[0] + rhs[1]),
+      (Production("prodlist", ("prodlist", "prod")),
+       lambda rhs: rhs[0] + rhs[1]),
       (Production("prodlist", ("prod", PyTok(NEWLINE)))),
+      (Production("prodlist", ("prod"))),
       (Production("prod", (PyTok(NAME), PyTok(OP, '-'), PyTok(OP, '>'), "alt")),
        lambda rhs: [(Production(rhs[0][1], alt_rhs), action)
                     for (alt_rhs, action) in rhs[-1]]),
