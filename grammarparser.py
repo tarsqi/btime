@@ -79,6 +79,15 @@ class GrammarSpecTokenizer(object):
 class InvalidActionError(Exception):
     pass
 
+# When we parse rules and actions, we need a global symbol table.
+# Unfortunately, the globals() built-in returns the dictionary of the
+# module in which the function calling it is defined (i.e., this module),
+# not the module from which that is called, which is what we want. To work
+# around this problem, parse_grammar_spec() accepts an argument which it
+# assigns to the following variable, and we use that as the globals
+# argument to eval() or exec.
+grammar_globals = None
+
 def compile_action(expr):
     if not (isinstance(expr, basestring) and
             GrammarSpecTokenizer.delimiters.get(expr[0]) == expr[-1]):
@@ -86,14 +95,15 @@ def compile_action(expr):
     try:
         # We first assume expr is a single Python expression, and use it as
         # the body of a lambda.
-        return eval(compile("lambda _: %s" % expr[1:-1], "<action>", "eval"))
+        return eval(compile("lambda _: %s" % expr[1:-1], "<action>", "eval"),
+                    grammar_globals or globals())
     except SyntaxError:
         # Well, it's not an expression (or at least not a valid one);
         # we'll assume it's a statement suite, and use it as the body of
         # a function definition.
         namespace = {}
         exec compile("def action(_): %s" % expr[1:-1], "<action>", "exec") in \
-            globals(), namespace
+            grammar_globals or globals(), namespace
         return namespace["action"]
 
 grammar_spec_grammar = AttributeGrammar([
@@ -125,12 +135,12 @@ grammar_spec_grammar = AttributeGrammar([
       (Production("sym", PyTok(STRING)), # literal
        lambda rhs: Literal(eval(rhs[0][1]))),
       (Production("sym", (PyTok(NAME), PyTok(TUPLE))), # funcall
-       lambda rhs: eval(rhs[0][1] + rhs[1][1])),
+       lambda rhs: eval(rhs[0][1] + rhs[1][1], grammar_globals)),
       (Production("action", PyTok(EXPR)),
        lambda rhs: compile_action(rhs[0][1]))],
     start="grammar")
 
-def parse_grammar_spec(spec, start,
+def parse_grammar_spec(spec, start, globals=None,
                        grammar_class=AttributeGrammar,
                        parser=Parser(grammar_spec_grammar)):
     """Given a grammar specification and a start symbol, return a new grammar
@@ -138,5 +148,7 @@ def parse_grammar_spec(spec, start,
     function."""
     assert issubclass(grammar_class, AttributeGrammar), \
         "Grammar class must be a subclass of AttributeGrammar."
+    global grammar_globals
+    grammar_globals = globals
     parser.parse(GrammarSpecTokenizer(spec))
     return grammar_class(parser.grammar.eval(parser.parses().next()), start)
