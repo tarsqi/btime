@@ -29,7 +29,7 @@ S -> S '+' M { _[0] + _[2] }
    | M
 M -> M '*' T { _[0] * _[2] }
    | T
-T -> Regexp(r"^\d+$", "number") { int(_[0]) }
+T -> r"^\d+$" { int(_[0]) }
 """
 def parse_expr(expr, grammar=parse_grammar_spec(arith_expr_grammar, "P")):
     parser = Parser(grammar)
@@ -46,7 +46,7 @@ class ParseExprTest(TestCase):
 # A rather larger grammer for English cardinals.
 number_grammar = """
 number -> zero | small | hundreds | thousands
-zero -> Regexp(r"^(zero|oh?|n?[ao]ught)$", "zero") { 0 }
+zero -> r"^(zero|oh?|n?[ao]ught)$" { 0 }
 small -> ones
     | zero ones { _[1] }
     | teen

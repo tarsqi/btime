@@ -19,10 +19,10 @@ month -> Abbrev("january", 3) { Month(1) }
     | Abbrev("november", 3) { Month(11) }
     | Abbrev("december", 3) { Month(12) }
 
-year -> number | Regexp("[0-9]{1,4}$") { int(_[0]) }
+year -> number | r"[0-9]{1,4}$" { int(_[0]) }
 
 number -> zero | small | hundreds | thousands
-zero -> Regexp(r"(zero|oh?|n?[ao]ught)$", "zero") { 0 }
+zero -> r"(zero|oh?|n?[ao]ught)$" { 0 }
 small -> ones
     | zero ones { _[1] }
     | teen
