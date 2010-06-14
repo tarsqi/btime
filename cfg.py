@@ -35,6 +35,10 @@ class Regexp(Terminal):
     def __str__(self):
         return self.name
 
+class Acronym(Regexp):
+    def __init__(self, acronym):
+        super(Acronym, self).__init__(r"\.?".join(acronym), acronym)
+
 class Abbrev(Terminal):
     def __init__(self, string, n):
         assert isinstance(string, basestring) and isinstance(n, int) and n > 0

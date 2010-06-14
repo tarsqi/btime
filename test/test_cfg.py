@@ -21,6 +21,15 @@ class TestRegexp(TestCase):
         self.assertFalse(Literal("foo+").match("fo"))
         self.assertFalse(Literal("foo+").match(None))
 
+class TestAcronym(TestCase):
+    def test_match_without(self):
+        """Match an acronym without periods"""
+        self.assertTrue(Acronym("ad").match("ad"))
+
+    def test_match_with(self):
+        """Match an acronym with periods"""
+        self.assertTrue(Acronym("ad").match("a.d."))
+
 class TestAbbrev(TestCase):
     def setUp(self):
         self.abbrev = Abbrev("foobar", 3)
@@ -40,6 +49,7 @@ def suite():
     return TestSuite([TestLoader().loadTestsFromTestCase(cls) \
                           for cls in (TestLiteral,
                                       TestRegexp,
+                                      TestAcronym,
                                       TestAbbrev)])
 
 def run(runner=TextTestRunner, **args):
