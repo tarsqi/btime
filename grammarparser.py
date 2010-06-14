@@ -72,7 +72,7 @@ class GrammarSpecTokenizer(object):
         token = getnext()
         if self.delimstack:
             return (self.delimtypes[token[1]],
-                    untokenize(tuple(getdelimitedtoks(token))))
+                    untokenize(tuple(getdelimitedtoks(token)))) + token[2:]
         else:
             return token
 
@@ -88,21 +88,37 @@ class InvalidActionError(Exception):
 # argument to eval() or exec.
 grammar_globals = None
 
-def compile_action(expr):
+def compile_action(lhs, action):
+    """Given a rule name (lhs) and an action specification, compile and
+    return a function of one argument (`_') with the given action as its
+    body. The action spec may be either a string or a Python token."""
+
+    lhs = lhs or "unknown rule"
+    if not action:
+        return default_action
+    elif (isinstance(action, tuple) and action[0] == EXPR):
+        type, expr, (lineno, col_offset) = action[:3]
+        filename = "<%s, line %d>" % (lhs, lineno)
+    elif isinstance(action, basestring):
+        expr = action
+        filename = "<%s>" % lhs
+    else:
+        raise ValueError("invalid action: %s")
+
     if not (isinstance(expr, basestring) and
             GrammarSpecTokenizer.delimiters.get(expr[0]) == expr[-1]):
         raise InvalidActionError("invalid action expression '%s'" % expr)
     try:
-        # We first assume expr is a single Python expression, and use it as
-        # the body of a lambda.
-        return eval(compile("lambda _: %s" % expr[1:-1], "<action>", "eval"),
+        # We first assume that expr is a single Python expression, and use
+        # it as the body of a lambda.
+        return eval(compile("lambda _: %s" % expr[1:-1], filename, "eval"),
                     grammar_globals or globals())
     except SyntaxError:
         # Well, it's not an expression (or at least not a valid one);
         # we'll assume it's a statement suite, and use it as the body of
         # a function definition.
         namespace = {}
-        exec compile("def action(_): %s" % expr[1:-1], "<action>", "exec") in \
+        exec compile("def action(_): %s" % expr[1:-1], filename, "exec") in \
             grammar_globals or globals(), namespace
         return namespace["action"]
 
@@ -116,7 +132,8 @@ grammar_spec_grammar = AttributeGrammar([
       (Production("prodlist", ("prod", PyTok(NEWLINE)))),
       (Production("prodlist", ("prod"))),
       (Production("prod", (PyTok(NAME), PyTok(OP, '-'), PyTok(OP, '>'), "alt")),
-       lambda rhs: [(Production(rhs[0][1], alt_rhs), action)
+       lambda rhs: [(Production(rhs[0][1], alt_rhs),
+                     compile_action(rhs[0][1], action))
                     for (alt_rhs, action) in rhs[-1]]),
       (Production("alt", ("alt", PyTok(OP, '|'), "rhs")),
        lambda rhs: rhs[0] + [rhs[-1]]),
@@ -128,7 +145,7 @@ grammar_spec_grammar = AttributeGrammar([
       (Production("rhs", ("symlist", "action")),
        lambda rhs: tuple(rhs)),
       (Production("rhs", ("symlist")),
-       lambda rhs: (rhs[0], default_action)),
+       lambda rhs: (rhs[0], None)),
       (Production("symlist", ("symlist", "sym")),
        lambda rhs: rhs[0] + [rhs[1]]),
       (Production("symlist", ("sym")),
@@ -139,8 +156,7 @@ grammar_spec_grammar = AttributeGrammar([
        lambda rhs: Literal(eval(rhs[0][1]))),
       (Production("sym", (PyTok(NAME), PyTok(TUPLE))), # funcall
        lambda rhs: eval(rhs[0][1] + rhs[1][1], grammar_globals)),
-      (Production("action", PyTok(EXPR)),
-       lambda rhs: compile_action(rhs[0][1]))],
+      (Production("action", PyTok(EXPR)))],
     start="grammar")
 
 def parse_grammar_spec(spec, start, globals=None,
