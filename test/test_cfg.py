@@ -30,6 +30,10 @@ class TestAcronym(TestCase):
         """Match an acronym with periods"""
         self.assertTrue(Acronym("ad").match("a.d."))
 
+    def test_mismatch(self):
+        """Fail to match an acronym"""
+        self.assertFalse(Acronym("ad").match("add"))
+
 class TestAbbrev(TestCase):
     def setUp(self):
         self.abbrev = Abbrev("foobar", 3)

@@ -37,7 +37,7 @@ class Regexp(Terminal):
 
 class Acronym(Regexp):
     def __init__(self, acronym):
-        super(Acronym, self).__init__(r"\.?".join(acronym), acronym)
+        super(Acronym, self).__init__(r"\.?".join(acronym + "$"), acronym)
 
 class Abbrev(Terminal):
     def __init__(self, string, n):
