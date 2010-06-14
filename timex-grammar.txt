@@ -1,0 +1,69 @@
+timex -> time
+
+time -> day month year { date(_[2], _[1].month, _[0].day) }
+    | month day year { date(_[2], _[0].month, _[1].day) }
+
+day -> number { Day(_[0]) }
+    | DayOfMonth() { Day(_[0]) }
+
+month -> Abbrev("january", 3) { Month(1) }
+    | Abbrev("february", 3) { Month(2) }
+    | Abbrev("march", 3) { Month(3) }
+    | Abbrev("april", 3) { Month(4) }
+    | "may" { Month(5) }
+    | Abbrev("june", 3) { Month(6) }
+    | Abbrev("july", 3) { Month(7) }
+    | Abbrev("august", 3) { Month(8) }
+    | Abbrev("september", 3) { Month(9) }
+    | Abbrev("october", 3) { Month(10) }
+    | Abbrev("november", 3) { Month(11) }
+    | Abbrev("december", 3) { Month(12) }
+
+year -> number | Regexp("[0-9]{1,4}$") { int(_[0]) }
+
+number -> zero | small | hundreds | thousands
+zero -> Regexp(r"(zero|oh?|n?[ao]ught)$", "zero") { 0 }
+small -> ones
+    | zero ones { _[1] }
+    | teen
+    | tens
+    | tens ones { _[0] + _[1] }
+ones -> "one" { 1 }
+    | "two" { 2 }
+    | "three" { 3 }
+    | "four" { 4 }
+    | "five" { 5 }
+    | "six" { 6 }
+    | "seven" { 7 }
+    | "eight" { 8 }
+    | "nine" { 9 }
+teen -> "ten" { 10 }
+    | "eleven" { 11 }
+    | "twelve" { 12 }
+    | "thirteen" { 13 }
+    | "fourteen" { 14 }
+    | "fifteen" { 15 }
+    | "sixteen" { 16 }
+    | "seventeen" { 17 }
+    | "eighteen" { 18 }
+    | "nineteen" { 19 }
+tens -> "twenty" { 20 }
+    | "thirty" { 30 }
+    | "forty" { 40 }
+    | "fifty" { 50 }
+    | "sixty" { 60 }
+    | "seventy" { 70 }
+    | "eighty" { 80 }
+    | "ninety" { 90 }
+hundreds -> small "hundred" { _[0] * 100 }
+    | small "hundred" small { (_[0] * 100) + _[2] }
+    | small "hundred" "and" small { (_[0] * 100) + _[3] }
+thousands -> small small { _[0] * 100 + _[1] }
+    | small "thousand" { _[0] * 1000 }
+    | small "thousand" small { (_[0] * 1000) + _[2] }
+    | small "thousand" "and" small { (_[0] * 1000) + _[3] }
+    | small "thousand" hundreds { (_[0] * 1000) + _[2] }
+    | hundreds "thousand" { _[0] * 1000 }
+    | hundreds "thousand" small { (_[0] * 1000) + _[2] }
+    | hundreds "thousand" "and" small { (_[0] * 1000) + _[3] }
+    | hundreds "thousand" hundreds { (_[0] * 1000) + _[2] }
