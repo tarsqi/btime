@@ -40,15 +40,16 @@ class Acronym(Regexp):
         super(Acronym, self).__init__(r"\.?".join(acronym + "$"), acronym)
 
 class Abbrev(Terminal):
-    def __init__(self, string, n):
-        assert isinstance(string, basestring) and isinstance(n, int) and n > 0
+    def __init__(self, string, min_prefix_len):
+        assert (isinstance(string, basestring) and
+                isinstance(min_prefix_len, int) and
+                min_prefix_len > 0)
         self.string = string
-        self.n = n
+        self.min = min_prefix_len
 
     def match(self, token):
-        return (token == self.string or
-                (token[0:self.n] == self.string[0:self.n] and
-                 token[self.n:] in (".", "")))
+        return (len(token) >= self.min and
+                self.string.startswith(token.rstrip(".")))
 
 class Production(object):
     """A production rule consists of a left-hand side (LHS) and a

@@ -42,12 +42,15 @@ class TestAbbrev(TestCase):
         """Match a whole or abbreviation"""
         self.assertTrue(self.abbrev.match("foobar"))
         self.assertTrue(self.abbrev.match("foo"))
+        self.assertTrue(self.abbrev.match("foob"))
         self.assertTrue(self.abbrev.match("foo."))
+        self.assertTrue(self.abbrev.match("foob."))
 
     def test_mismatch(self):
         """Fail to match an abbreviation"""
         self.assertFalse(self.abbrev.match("bar"))
         self.assertFalse(self.abbrev.match("foo.bar"))
+        self.assertFalse(self.abbrev.match("fooq"))
 
 def suite():
     return TestSuite([TestLoader().loadTestsFromTestCase(cls) \
