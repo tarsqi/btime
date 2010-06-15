@@ -51,6 +51,7 @@ class TestAbbrev(TestCase):
         self.assertFalse(self.abbrev.match("bar"))
         self.assertFalse(self.abbrev.match("foo.bar"))
         self.assertFalse(self.abbrev.match("fooq"))
+        self.assertFalse(self.abbrev.match("foobarbaz"))
 
 def suite():
     return TestSuite([TestLoader().loadTestsFromTestCase(cls) \
