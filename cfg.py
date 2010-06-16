@@ -24,7 +24,7 @@ class Literal(Terminal):
     def __str__(self):
         return self.lit
 
-class Regexp(Terminal):
+class RegexpTerminal(Terminal):
     def __init__(self, pattern, name=None):
         self.pattern = re.compile(pattern)
         self.name = name or pattern
@@ -35,7 +35,7 @@ class Regexp(Terminal):
     def __str__(self):
         return self.name
 
-class Acronym(Regexp):
+class Acronym(RegexpTerminal):
     def __init__(self, acronym):
         super(Acronym, self).__init__(r"\.?".join(acronym + "$"), acronym)
 

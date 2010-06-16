@@ -153,7 +153,7 @@ grammar_spec_grammar = AttributeGrammar([
       (Production("sym", PyTok(NAME)), # nonterminal
        lambda rhs: rhs[0][1]),
       (Production("sym", PyTok(STRING)), # literal, either string or regexp
-       lambda rhs: Regexp(eval(rhs[0][1])) \
+       lambda rhs: RegexpTerminal(eval(rhs[0][1])) \
            if rhs[0][1][0] == "r" or rhs[0][1][:2] == "ur"
            else Literal(eval(rhs[0][1]))),
       (Production("sym", (PyTok(NAME), PyTok(TUPLE))), # funcall

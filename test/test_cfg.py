@@ -14,7 +14,7 @@ class TestLiteral(TestCase):
 class TestRegexp(TestCase):
     def test_match(self):
         """Match a regular expression"""
-        self.assertTrue(Regexp("foo+").match("fooooo"))
+        self.assertTrue(RegexpTerminal("foo+").match("fooooo"))
 
     def test_mismatch(self):
         """Fail to match a regular expression"""

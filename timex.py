@@ -23,7 +23,7 @@ class Month(object):
             raise ValueError("invalid month: %d" % month)
         self.month = month
 
-class DayOfMonth(Regexp):
+class DayOfMonth(RegexpTerminal):
     def __init__(self):
         super(DayOfMonth, self).__init__(r"([0-9]{1,2})(st|nd|rd|th)?$", "day")
 
@@ -31,7 +31,7 @@ class DayOfMonth(Regexp):
         m = super(DayOfMonth, self).match(token)
         return m and 1 <= int(m.group(1)) <= 31
 
-class MonthNumber(Regexp):
+class MonthNumber(RegexpTerminal):
     def __init__(self):
         super(MonthNumber, self).__init__(r"([0-9]{1,2})$", "month")
 
