@@ -76,9 +76,9 @@ class CalendarDate(Date):
     """A calendar date, as specified by section 4.1.2."""
 
     def __init__(self, year, month=None, day=None):
-        self.year, self.month, self.day = (ensure_element(year, Year),
-                                           ensure_element(month, Month),
-                                           ensure_element(day, DayOfMonth))
+        self.year = ensure_element(year, Year)
+        self.month = ensure_element(month, Month)
+        self.day = ensure_element(day, DayOfMonth)
         super(CalendarDate, self).__init__(self.year, self.month, self.day)
 
     def iso8601(self, extended=False):
@@ -92,17 +92,17 @@ class OrdinalDate(Date):
     """An ordinal date, as specified by section 4.1.3."""
 
     def __init__(self, year, day=None):
-        self.year, self.day = (ensure_element(year, Year),
-                               ensure_element(day, DayOfYear))
+        self.year = ensure_element(year, Year)
+        self.day = ensure_element(day, DayOfYear)
         super(OrdinalDate, self).__init__(self.year, self.day)
 
 class WeekDate(Date):
     """A week date, as specified by section 4.1.4."""
 
     def __init__(self, year, week=None, day=None):
-        self.year, self.week, self.day = (ensure_element(year, Year),
-                                          ensure_element(week, Week),
-                                          ensure_element(day, DayOfWeek))
+        self.year = ensure_element(year, Year)
+        self.week = ensure_element(week, Week)
+        self.day = ensure_element(day, DayOfWeek)
         super(WeekDate, self).__init__(self.year, self.week, self.day)
 
 class Time(BaseDateTime):
@@ -111,12 +111,14 @@ class Time(BaseDateTime):
     extsep = ":"
 
     def __init__(self, hour, minute=None, second=None, offset=None):
-        self.hour, self.minute, self.second = (ensure_element(hour, Hour),
-                                               ensure_element(minute, Minute),
-                                               ensure_element(second, Second))
-        assert offset is None or isinstance(offset, UTCOffset), "invalid offset"
+        self.hour = ensure_element(hour, Hour)
+        self.minute = ensure_element(minute, Minute)
+        self.second = ensure_element(second, Second)
+        if offset is None or isinstance(offset, UTCOffset):
+            self.offset = offset
+        else:
+            raise InvalidDateTime("invalid offset from UTC: %s" % offset)
         super(Time, self).__init__(self.hour, self.minute, self.second)
-        self.offset = offset
 
     def iso8601(self, extended=False):
         return super(Time, self).iso8601(extended) + \
@@ -128,8 +130,8 @@ class UTCOffset(BaseDateTime):
     extsep = ":"
 
     def __init__(self, hour=0, minute=None):
-        self.hour, self.minute = (ensure_element(hour, Hour),
-                                  ensure_element(minute, Minute))
+        self.hour = ensure_element(hour, Hour)
+        self.minute = ensure_element(minute, Minute)
         super(UTCOffset, self).__init__(self.hour, self.minute)
 
     def iso8601(self, extended=False):
@@ -149,7 +151,9 @@ class DateTime(BaseDateTime):
         assert time is None or isinstance(time, Time)
         if time and date and date.reduced_accuracy:
             raise InvalidDateTime("can't have time with an incomplete date")
-        super(DateTime, self).__init__(date, time)
+        self.date = date
+        self.time = time
+        super(DateTime, self).__init__(self.date, self.time)
 
 class PartialTime(object):
     """Represents some portion of a possibly incomplete date and time.
