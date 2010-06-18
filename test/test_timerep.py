@@ -34,12 +34,12 @@ class TestTimeElement(TestCase):
     def test_init_from_int(self):
         """Time element from integer"""
         elt = TimeElement(42)
-        self.assertEqual(elt.value, 42)
+        self.assertEqual(elt, 42)
 
     def test_init_from_string(self):
         """Time element from string"""
         elt = TimeElement("42")
-        self.assertEqual(elt.value, 42)
+        self.assertEqual(elt, 42)
 
     def test_invalid(self):
         """Invalid time element"""
@@ -49,7 +49,11 @@ class TestTimeElement(TestCase):
         """Equality of time elements"""
         self.assertEqual(TimeElement(42), TimeElement("42"))
         self.assertEqual(TimeElement(42), 42)
+
+    def test_inequality(self):
+        """Inequality of time elements"""
         self.assertNotEqual(TimeElement(42), TimeElement(24))
+        self.assertNotEqual(TimeElement(42), 24)
 
     def test_lt(self):
         """Comparison of time elements"""
@@ -74,7 +78,7 @@ class TestYear(TestCase):
     def test_valid(self):
         """Valid year"""
         year = Year(2000)
-        self.assertEqual(year.value, 2000)
+        self.assertEqual(year, 2000)
         self.assertEqual(year.iso8601(), "2000")
 
     def test_invalid(self):
@@ -85,7 +89,7 @@ class TestMonth(TestCase):
     def test_valid(self):
         """Valid month"""
         month = Month(3)
-        self.assertEqual(month.value, 3)
+        self.assertEqual(month, 3)
         self.assertEqual(month.iso8601(), "03")
 
     def test_invalid(self):
@@ -96,7 +100,7 @@ class TestWeek(TestCase):
     def test_valid(self):
         """Valid calendar week"""
         week = Week(15)
-        self.assertEqual(week.value, 15)
+        self.assertEqual(week, 15)
         self.assertEqual(week.iso8601(), "W15")
 
     def test_invalid(self):
@@ -107,7 +111,7 @@ class TestDayOfYear(TestCase):
     def test_valid(self):
         """Valid day of year"""
         day = DayOfYear(155)
-        self.assertEqual(day.value, 155)
+        self.assertEqual(day, 155)
         self.assertEqual(day.iso8601(), "155")
 
     def test_invalid(self):
@@ -118,7 +122,7 @@ class TestDayOfMonth(TestCase):
     def test_valid(self):
         """Valid day of month"""
         day = DayOfMonth(15)
-        self.assertEqual(day.value, 15)
+        self.assertEqual(day, 15)
         self.assertEqual(day.iso8601(), "15")
 
     def test_invalid(self):
@@ -129,18 +133,32 @@ class TestDayOfWeek(TestCase):
     def test_valid(self):
         """Valid day of week"""
         day = DayOfWeek(5)
-        self.assertEqual(day.value, 5)
+        self.assertEqual(day, 5)
         self.assertEqual(day.iso8601(), "5")
 
     def test_invalid(self):
         """Invalid day of week"""
         self.assertRaises(InvalidTimeElement, lambda: DayOfWeek(8))
 
+class TestDaysNotEqual(TestCase):
+    def test_days(self):
+        """Not all days are created equal"""
+        self.assertNotEqual(DayOfMonth(4), DayOfWeek(4))
+        self.assertNotEqual(DayOfWeek(4), DayOfYear(4))
+        self.assertNotEqual(DayOfMonth(4), DayOfYear(4))
+
 class TestCalendarDate(TestCase):
+    def test_elements(self):
+        """Calendar date elements"""
+        date = CalendarDate(1985, 4, 12)
+        self.assertEqual(date.year, Year(1985))
+        self.assertEqual(date.month, Month(4))
+        self.assertEqual(date.day, DayOfMonth(12))
+
     def test_complete_representation(self):
         """Complete representation of a calendar date"""
         # section 4.1.2.2
-        date = CalendarDate(Year(1985), Month(4), DayOfMonth(12))
+        date = CalendarDate(1985, 4, 12)
         self.assertFalse(date.reduced_accuracy)
         self.assertEqual(date.iso8601(False), "19850412")
         self.assertEqual(date.iso8601(True), "1985-04-12")
@@ -148,38 +166,51 @@ class TestCalendarDate(TestCase):
     def test_specific_month(self):
         """A specific month"""
         # section 4.1.2.3 (a)
-        date = CalendarDate(Year(1985), Month(4))
+        date = CalendarDate(1985, 4)
         self.assertTrue(date.reduced_accuracy)
         self.assertEqual(date.iso8601(), "1985-04")
 
     def test_specific_year(self):
         """A specific year"""
         # section 4.1.2.3 (b)
-        date = CalendarDate(Year(1985))
+        date = CalendarDate(1985)
         self.assertTrue(date.reduced_accuracy)
         self.assertEqual(date.iso8601(), "1985")
 
     def test_specific_century(self):
         """A specific century"""
         # section 4.1.2.3 (c)
-        date = CalendarDate(Year(19))
+        date = CalendarDate(19)
         self.assertTrue(date.reduced_accuracy)
         self.assertEqual(date.iso8601(), "19")
 
 class TestOrdinalDate(TestCase):
+    def test_elements(self):
+        """Ordinal date elements"""
+        date = OrdinalDate(1985, 102)
+        self.assertEqual(date.year, Year(1985))
+        self.assertEqual(date.day, DayOfYear(102))
+
     def test_complete_representation(self):
         """Complete representation of an ordinal date"""
         # section 4.1.3.2
-        date = OrdinalDate(Year(1985), DayOfYear(102))
+        date = OrdinalDate(1985, 102)
         self.assertFalse(date.reduced_accuracy)
         self.assertEqual(date.iso8601(False), "1985102")
         self.assertEqual(date.iso8601(True), "1985-102")
 
 class TestWeekDate(TestCase):
+    def test_elements(self):
+        """Week date elements"""
+        date = WeekDate(1985, 15, 5)
+        self.assertEqual(date.year, Year(1985))
+        self.assertEqual(date.week, Week(15))
+        self.assertEqual(date.day, DayOfWeek(5))
+
     def test_complete_representation(self):
         """Complete representation of a week date"""
         # section 4.1.4.2
-        date = WeekDate(Year(1985), Week(15), DayOfWeek(5))
+        date = WeekDate(1985, 15, 5)
         self.assertFalse(date.reduced_accuracy)
         self.assertEqual(date.iso8601(False), "1985W155")
         self.assertEqual(date.iso8601(True), "1985-W15-5")
@@ -187,7 +218,7 @@ class TestWeekDate(TestCase):
     def test_specific_week(self):
         """A specific week"""
         # section 4.1.4.3
-        date = WeekDate(Year(1985), Week(15))
+        date = WeekDate(1985, 15)
         self.assertTrue(date.reduced_accuracy)
         self.assertEqual(date.iso8601(False), "1985W15")
         self.assertEqual(date.iso8601(True), "1985-W15")
@@ -298,7 +329,7 @@ class TestPartialTime(TestCase):
         date = Year(2000) + Month(3)
         self.assertEqual(date.year, 2000)
         self.assertEqual(date.month, 3)
-        self.assertEqual(date.dayofmonth, None)
+        self.assertEqual(date.day, None)
         self.assertEqual(date.iso8601(), "2000-03")
 
     def test_commutativity(self):

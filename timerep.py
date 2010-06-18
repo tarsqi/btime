@@ -76,10 +76,10 @@ class CalendarDate(Date):
     """A calendar date, as specified by section 4.1.2."""
 
     def __init__(self, year, month=None, day=None):
-        year, month, day = (ensure_element(year, Year),
-                            ensure_element(month, Month),
-                            ensure_element(day, DayOfMonth))
-        super(CalendarDate, self).__init__(year, month, day)
+        self.year, self.month, self.day = (ensure_element(year, Year),
+                                           ensure_element(month, Month),
+                                           ensure_element(day, DayOfMonth))
+        super(CalendarDate, self).__init__(self.year, self.month, self.day)
 
     def iso8601(self, extended=False):
         if len(self) == 2:
@@ -92,18 +92,18 @@ class OrdinalDate(Date):
     """An ordinal date, as specified by section 4.1.3."""
 
     def __init__(self, year, day=None):
-        year, day = (ensure_element(year, Year),
-                     ensure_element(day, DayOfYear))
-        super(OrdinalDate, self).__init__(year, day)
+        self.year, self.day = (ensure_element(year, Year),
+                               ensure_element(day, DayOfYear))
+        super(OrdinalDate, self).__init__(self.year, self.day)
 
 class WeekDate(Date):
     """A week date, as specified by section 4.1.4."""
 
     def __init__(self, year, week=None, day=None):
-        year, week, day = (ensure_element(year, Year),
-                           ensure_element(week, Week),
-                           ensure_element(day, DayOfWeek))
-        super(WeekDate, self).__init__(year, week, day)
+        self.year, self.week, self.day = (ensure_element(year, Year),
+                                          ensure_element(week, Week),
+                                          ensure_element(day, DayOfWeek))
+        super(WeekDate, self).__init__(self.year, self.week, self.day)
 
 class Time(BaseDateTime):
     """Time of day, as specified by section 4.2."""
@@ -111,11 +111,11 @@ class Time(BaseDateTime):
     extsep = ":"
 
     def __init__(self, hour, minute=None, second=None, offset=None):
-        hour, minute, second = (ensure_element(hour, Hour),
-                                ensure_element(minute, Minute),
-                                ensure_element(second, Second))
+        self.hour, self.minute, self.second = (ensure_element(hour, Hour),
+                                               ensure_element(minute, Minute),
+                                               ensure_element(second, Second))
         assert offset is None or isinstance(offset, UTCOffset), "invalid offset"
-        super(Time, self).__init__(hour, minute, second)
+        super(Time, self).__init__(self.hour, self.minute, self.second)
         self.offset = offset
 
     def iso8601(self, extended=False):
@@ -128,9 +128,9 @@ class UTCOffset(BaseDateTime):
     extsep = ":"
 
     def __init__(self, hour=0, minute=None):
-        hour, minute = (ensure_element(hour, Hour),
-                        ensure_element(minute, Minute))
-        super(UTCOffset, self).__init__(hour, minute)
+        self.hour, self.minute = (ensure_element(hour, Hour),
+                                  ensure_element(minute, Minute))
+        super(UTCOffset, self).__init__(self.hour, self.minute)
 
     def iso8601(self, extended=False):
         if any(map(lambda x: x != 0, self.elements)):
@@ -255,18 +255,22 @@ class Week(TimeElement):
     def iso8601(self, extended=False):
         return "W%02d" % self.value
 
-class DayOfYear(TimeElement):
+class Day(TimeElement):
+    """Common base class for days."""
+    pass
+
+class DayOfYear(Day):
     def isvalid(self):
         return 1 <= self.value <= 366
 
     def iso8601(self, extended=False):
         return "%03d" % self.value
 
-class DayOfMonth(TimeElement):
+class DayOfMonth(Day):
     def isvalid(self):
         return 1 <= self.value <= 31
 
-class DayOfWeek(TimeElement):
+class DayOfWeek(Day):
     def isvalid(self):
         return 1 <= self.value <= 7
 
