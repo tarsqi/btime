@@ -1,10 +1,10 @@
 timex -> time
 
-time -> day month year { date(_[2], _[1].month, _[0].day) }
-    | month day year { date(_[2], _[0].month, _[1].day) }
+time -> day month year { CalendarDate(_[2], _[1], _[0]) }
+    | month day year { CalendarDate(_[2], _[0], _[1]) }
 
-day -> number { Day(_[0]) }
-    | DayOfMonth() { Day(_[0]) }
+day -> number { DayOfMonth(_[0]) }
+    | DayOfMonthToken() { DayOfMonth(_[0]) }
 
 month -> Abbrev("january", 3) { Month(1) }
     | Abbrev("february", 3) { Month(2) }
@@ -19,7 +19,7 @@ month -> Abbrev("january", 3) { Month(1) }
     | Abbrev("november", 3) { Month(11) }
     | Abbrev("december", 3) { Month(12) }
 
-year -> number | r"[0-9]{1,4}$" { int(_[0]) }
+year -> number | r"[0-9]{1,4}$" { Year(_[0]) }
 
 number -> zero | small | hundreds | thousands
 zero -> r"(zero|oh?|n?[ao]ught)$" { 0 }
