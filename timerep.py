@@ -1,3 +1,4 @@
+# -*- mode: Python; coding: utf-8 -*-
 """Representations of dates and times as specified by ISO 8601:2004(E).
 
 Unlike most date & time libraries, this one is designed to allow arbitrarily
@@ -204,6 +205,15 @@ class TimeElement(PartialTime):
 
     def iso8601(self, extended=False):
         return "%02d" % self.value
+
+    def __sub__(self, other):
+        u"""Naïve subtraction (does not deal with underflow)."""
+        if isinstance(other, self.__class__):
+            return self.__class__(self.value - other.value)
+        elif isinstance(other, int):
+            return self.__class__(self.value - other)
+        else:
+            return NotImplemented
 
     def __eq__(self, other):
         if isinstance(other, self.__class__):

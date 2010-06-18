@@ -1,3 +1,5 @@
+# -*- mode: Python; coding: utf-8 -*-
+
 from unittest import *
 
 from timerep import *
@@ -59,6 +61,11 @@ class TestTimeElement(TestCase):
         """Comparison of time elements"""
         self.assertTrue(TimeElement(1) < TimeElement(2))
         self.assertTrue(TimeElement(1) < 2)
+
+    def test_subtraction(self):
+        u"""(Naïve) subtraction of time elements"""
+        self.assertEqual(TimeElement(3) - TimeElement(2), TimeElement(1))
+        self.assertEqual(TimeElement(3) - 2, TimeElement(1))
 
 class TestEnsureElement(TestCase):
     def test_none(self):
