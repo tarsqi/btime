@@ -1,3 +1,4 @@
+# -*- mode: Python; coding: utf-8 -*-
 """Context-free grammars."""
 
 __author__ = "Alex Plotnick <plotnick@cs.brandeis.edu>"
@@ -79,7 +80,7 @@ class Production(object):
         return "Production(%s, %s)" % (self.lhs, self.rhs)
 
     def __unicode__(self):
-        return u"%s \u2192 %s" % (self.lhs, u" ".join(map(unicode, self.rhs)))
+        return u"%s → %s" % (self.lhs, u" ".join(map(unicode, self.rhs)))
 
     if sys.version_info > (3, 0):
         __str__ = __unicode__

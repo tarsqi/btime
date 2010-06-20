@@ -1,3 +1,4 @@
+# -*- mode: Python; coding: utf-8 -*-
 """A straightforward implementation of the Earley parsing algorithm."""
 
 __author__ = "Alex Plotnick <plotnick@cs.brandeis.edu>"
@@ -38,13 +39,13 @@ class State(object):
         return not (self == other)
 
     def __unicode__(self):
-        s = u"[%s \u2192" % self.rule.lhs
+        s = u"[%s →" % self.rule.lhs
         for i in range(len(self.rule)):
             # We should use an interpunct (U+00B7) for the dot, but those
             # tend to be a little light, so we'll use a bullet instead.
-            s += u"%s%s" % (u"\u2022" if i == self.dot else " ",
+            s += u"%s%s" % (u"•" if i == self.dot else " ",
                             self.rule.rhs[i])
-        if self.complete: s += u"\u2022"
+        if self.complete: s += u"•"
         s += u", %d]" % self.start
         return s
 
