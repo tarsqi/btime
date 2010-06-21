@@ -8,7 +8,7 @@ class TestParseRepr(TestCase):
     class X(TimePoint):
         """Dummy time element."""
         digits = {"X": TimeUnit}
-        separators = "-"
+        separators = ["-"]
 
     def assertFormatRepr(self, format_repr, op):
         self.assertEqual(parse_format_repr(self.X, format_repr).next(), op)
