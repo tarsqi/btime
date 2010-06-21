@@ -160,7 +160,8 @@ class TimePoint(object):
         self.reduced_accuracy |= lse < len(elements) - 1
 
 class Date(TimePoint):
-    separators = ["-"]
+    separators = [u"-", # hyphen-minus (a.k.a. ASCII hyphen, U+002D)
+                  u"‐"] # hyphen (U+2010)
 
 class CalendarDate(Date):
     digits = {"Y": Year, "M": Month, "D": DayOfMonth}
