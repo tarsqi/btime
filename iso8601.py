@@ -278,7 +278,7 @@ class TimeInterval(object):
             raise ValueError("invalid interval: %s" % (args,))
 
 class RecurringTimeInterval(object):
-    def __init__(self, n=None, interval):
+    def __init__(self, n, interval):
         if n is not None and n < 0:
             raise TypeError("invalid number of reccurrences %d" % n)
         if not isinstance(interval, TimeInterval):
