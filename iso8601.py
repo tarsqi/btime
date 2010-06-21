@@ -241,6 +241,41 @@ class WeekDateTime(DateTime, WeekDate, Time):
         WeekDate.__init__(self, year, week, day)
         Time.__init__(self, hour, minute, second, offset)
 
+class Duration(object):
+    def __init__(self, years=0, months=0, days=0,
+                 hours=0, minutes=0, seconds=0,
+                 weeks=None):
+        if weeks is not None:
+            self.weeks = weeks
+        else:
+            self.years = years
+            self.months = months
+            self.days = days
+            self.hours = hours
+            self.minutes = minutes
+            self.seconds = seconds
+
+class TimeInterval(object):
+    def __init__(self, *args):
+        assert len(args) <= 2
+        if len(args) == 1:
+            if isinstance(args[0], Duration):
+                # 4.4.1 b) a duration and context information
+                self.duration = args[0]
+            else:
+                raise ValueError("invalid interval: %s" % (args,))
+        elif isinstance(args[0], DateTime) and isinstance(args[1], DateTime):
+            # 4.4.1 a) a start and an end
+            self.start, self.end = args
+        elif isinstance(args[0], DateTime) and isinstance(args[1], Duration):
+            # 4.4.1 c) a start and a duration
+            self.start, self.duration = args
+        elif isinstance(args[0], Duration) and isinstance(args[1], DateTime):
+            # 4.4.1 d) a duration and an end
+            self.duration, self.end = args
+        else:
+            raise ValueError("invalid interval: %s" % (args,))
+
 class FormatOp(object):
     pass
 
