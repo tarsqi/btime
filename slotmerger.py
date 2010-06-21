@@ -23,8 +23,10 @@ class SlotMerger(type):
                 """Merge the contents of new into old and return old."""
                 if old is None:
                     return copy(new)
-                assert (issubclass(type(old), type(new)) or \
-                        issubclass(type(new), type(old)))
+                if not (issubclass(type(old), type(new)) or
+                        issubclass(type(new), type(old))):
+                    raise TypeError("can't merge slots of different types: " +
+                                    "%s, %s" % (old, new))
                 if hasattr(old, "update"): # e.g., dict
                     old.update(new)
                     return old
