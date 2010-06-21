@@ -289,23 +289,29 @@ class RecurringTimeInterval(object):
 class FormatOp(object):
     pass
 
-class Literal(FormatOp):
-    def __init__(self, lit):
-        self.value = self.pattern = str(lit)
+class Character(FormatOp):
+    def __init__(self, char):
+        self.char = char
 
     def format(self, obj):
-        return self.value
+        return self.char
+
+    def read(self, string, start):
+        if string[start] == self.char:
+            return (self.char, start+1)
+        else:
+            return (None, start)
 
     def __eq__(self, other):
-        return isinstance(other, self.__class__) and self.value == other.value
+        return isinstance(other, self.__class__) and self.char == other.char
 
     def __repr__(self):
-        return "%s(%s)" % (self.__class__.__name__, self.value)
+        return "%s(%s)" % (self.__class__.__name__, self.char)
 
-class Designator(Literal):
+class Designator(Character):
     pass
 
-class Separator(Literal):
+class Separator(Character):
     pass
 
 class Element(FormatOp):
@@ -314,8 +320,9 @@ class Element(FormatOp):
         self.min = min
         self.max = max
         self.signed = signed
-        self.pattern = "(%s[0-9]{%d,%s})" % ("[+-]" if signed else "",
-                                             self.min, self.max or "")
+        self.pattern = re.compile("(%s[0-9]{%d,%s})" % \
+                                      ("[+-]" if signed else "",
+                                       self.min, self.max or ""))
 
     def element(self, obj):
         return getattr(obj, self.cls.__name__.lower())
@@ -325,8 +332,13 @@ class Element(FormatOp):
         return ((("-" if value < 0 else "+") if self.signed else "") +
                 ("%0*d" % (self.min, abs(value)))[0:self.max])
 
-    def __call__(self, value):
-        return self.cls(value)
+    def read(self, string, start):
+        match = self.pattern.match(string[start:])
+        if match:
+            digits = match.group(0)
+            return (self.cls(int(digits)), start + len(digits))
+        else:
+            return (None, start)
 
     def __eq__(self, other):
         return (isinstance(other, self.__class__) and
@@ -373,22 +385,30 @@ def parse_format_repr(cls, format_repr):
     except StopIteration:
         pass
 
+class ParseError(Exception):
+    def __init__(self, cls, i):
+        self.cls = cls
+        self.i = i
+
+    def __str__(self):
+        return "parse error: %s (char %d)" % (self.cls.__name__, self.i)
+
 class Format(object):
     def __init__(self, cls, format_repr):
         self.cls = cls
         self.ops = list(parse_format_repr(cls, format_repr))
-        self.regex = re.compile("".join([op.pattern for op in self.ops]) + "$")
 
     def format(self, obj):
         return "".join([op.format(obj) for op in self.ops])
 
     def read(self, string):
-        match = self.regex.match(string)
-        if match:
-            elements = []
-            i = 1
-            for op in self.ops:
-                if isinstance(op, Element):
-                    elements.append(op(int(match.group(i))))
-                    i += 1
-            return self.cls(*elements)
+        i = 0
+        elements = []
+        ops = iter(self.ops)
+        while i < len(string):
+            x, i = ops.next().read(string, i)
+            if x is None:
+                raise ParseError(self.cls, i)
+            elif isinstance(x, TimeUnit):
+                elements.append(x)
+        return self.cls(*elements)
