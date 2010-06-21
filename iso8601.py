@@ -141,7 +141,7 @@ class TimePoint(object):
     __metaclass__ = SlotMerger
     __merge__ = ["designators", "separators", "digits"]
 
-    designators = {}
+    designators = []
     separators = []
     digits = {}
 
@@ -212,7 +212,7 @@ class UTCOffset(TimePoint):
 UTC = UTCOffset(0)
 
 class DateTime(TimePoint):
-    designators = {"T": Time} # XXX
+    designators = ["T"]
 
     def __init__(self, date, time):
         assert date is None or isinstance(date, Date)
@@ -244,35 +244,24 @@ class WeekDateTime(DateTime, WeekDate, Time):
 class FormatOp(object):
     pass
 
-class Designator(FormatOp):
-    def __init__(self, cls):
-        self.cls = cls
+class Literal(FormatOp):
+    def __init__(self, lit):
+        self.value = self.pattern = str(lit)
 
     def format(self, obj):
-        pass
-
-    def __repr__(self):
-        return "%s(%s)" % (self.__class__.__name__, self.cls.__name__)
-
-class Separator(FormatOp):
-    def __init__(self, separator):
-        self.separator = separator
-
-    def format(self, obj):
-        return self.separator
-
-    def read(self, string, start):
-        if string[start] == self.separator:
-            return (self.separator, start+1)
-        else:
-            return (None, start)
+        return self.value
 
     def __eq__(self, other):
-        return (isinstance(other, self.__class__) and
-                self.separator == other.separator)
+        return isinstance(other, self.__class__) and self.value == other.value
 
     def __repr__(self):
-        return "%s(%s)" % (self.__class__.__name__, self.sep)
+        return "%s(%s)" % (self.__class__.__name__, self.value)
+
+class Designator(Literal):
+    pass
+
+class Separator(Literal):
+    pass
 
 class Element(FormatOp):
     def __init__(self, cls, min=0, max=None, signed=False):
@@ -280,8 +269,8 @@ class Element(FormatOp):
         self.min = min
         self.max = max
         self.signed = signed
-        self.pattern = re.compile(("[+-]" if signed else "") +
-                                  "[0-9]{%d,%s}" % (self.min, self.max or ""))
+        self.pattern = "(%s[0-9]{%d,%s})" % ("[+-]" if signed else "",
+                                             self.min, self.max or "")
 
     def element(self, obj):
         return getattr(obj, self.cls.__name__.lower())
@@ -291,13 +280,8 @@ class Element(FormatOp):
         return ((("-" if value < 0 else "+") if self.signed else "") +
                 ("%0*d" % (self.min, abs(value)))[0:self.max])
 
-    def read(self, string, start):
-        match = self.pattern.match(string[start:])
-        if match:
-            digits = match.group(0)
-            return (self.cls(int(digits)), start + len(digits))
-        else:
-            return (None, start)
+    def __call__(self, value):
+        return self.cls(value)
 
     def __eq__(self, other):
         return (isinstance(other, self.__class__) and
@@ -306,14 +290,15 @@ class Element(FormatOp):
                 self.max == other.max)
 
     def __repr__(self):
-        return "%s(%s, %d, %d)" % (self.__class__.__name__,
-                                   self.cls.__name__, self.min, self.max)
+        return "%s(%s, %d, %d, %s)" % (self.__class__.__name__,
+                                       self.cls.__name__, self.min, self.max,
+                                       self.signed)
 
 def parse_format_repr(cls, format_repr):
     i = peekable(format_repr)
-    def op(c):
+    def getop(c):
         if c in cls.designators:
-            return Designator(cls.designators[c])
+            return Designator(c)
         elif c in cls.separators:
             return Separator(c)
         elif c == "_":
@@ -339,33 +324,26 @@ def parse_format_repr(cls, format_repr):
             return Element(cls.digits[c], n, n, signed)
     try:
         while True:
-            yield op(i.next())
+            yield getop(i.next())
     except StopIteration:
         pass
-
-class ParseError(Exception):
-    def __init__(self, cls, i):
-        self.cls = cls
-        self.i = i
-
-    def __str__(self):
-        return "parse error: %s (char %d)" % (self.cls.__name__, self.i)
 
 class Format(object):
     def __init__(self, cls, format_repr):
         self.cls = cls
         self.ops = list(parse_format_repr(cls, format_repr))
+        self.regex = re.compile("".join([op.pattern for op in self.ops]) + "$")
 
     def format(self, obj):
         return "".join([op.format(obj) for op in self.ops])
 
     def read(self, string):
-        i = 0
-        elements = []
-        for op in self.ops:
-            x, i = op.read(string, i)
-            if x is None:
-                raise ParseError(self.cls, i)
-            elif isinstance(x, TimeUnit):
-                elements.append(x)
-        return self.cls(*elements)
+        match = self.regex.match(string)
+        if match:
+            elements = []
+            i = 1
+            for op in self.ops:
+                if isinstance(op, Element):
+                    elements.append(op(int(match.group(i))))
+                    i += 1
+            return self.cls(*elements)
