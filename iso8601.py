@@ -275,6 +275,15 @@ class TimeInterval(object):
             self.duration, self.end = args
         else:
             raise ValueError("invalid interval: %s" % (args,))
+
+class RecurringTimeInterval(object):
+    def __init__(self, n=None, interval):
+        if n is not None and n < 0:
+            raise TypeError("invalid number of reccurrences %d" % n)
+        if not isinstance(interval, TimeInterval):
+            raise TypeError("invalid interval %s" % interval)
+        self.n = n
+        self.interval = interval
 
 class FormatOp(object):
     pass
