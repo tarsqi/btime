@@ -3,9 +3,256 @@
 from functools import wraps
 import re
 
-from peekable import peekable
 from slotmerger import SlotMerger
 
+class StopFormat(Exception):
+    pass
+
+class FormatOp(object):
+    """FormatOps, or fops, are the operations of a teeny-tiny virtual machine.
+    The state of a machine is completely described by a stack of components,
+    an input string, and a position in the input."""
+
+    def execute(self, m):
+        raise StopFormat(m)
+
+class Literal(FormatOp):
+    def __init__(self, lit):
+        self.lit = lit.upper()
+
+    def format(self, obj):
+        return self.lit
+
+    def execute(self, m):
+        if not self.lit or m.input.startswith(self.lit, m.i):
+            m.stack.append(self)
+            m.i += len(self.lit)
+            return True
+
+    def __eq__(self, other):
+        return ((isinstance(other, basestring) and self.lit == other.upper()) or
+                (isinstance(other, self.__class__) and self.lit == other.lit))
+
+    def __repr__(self):
+        return "%s(%r)" % (self.__class__.__name__, self.lit)
+
+class Separator(Literal):
+    def __init__(self, lit, optional, ends):
+        super(Separator, self).__init__(lit)
+        self.optional = optional
+        self.ends = ends
+
+    def execute(self, m):
+        if super(Separator, self).execute(m):
+            m.stack.pop() # drop separator, maybe temporarily
+            for d in self.ends:
+                for i, x in enumerate(reversed(m.stack)):
+                    if x is d:
+                        m.stack[-i-1:] = [d.complete(m.stack[-i:])]
+                        break
+            if not self.optional:
+                m.stack.append(self) # put separator back
+
+    def __repr__(self):
+        return "%s(%r, %r, %r)" % (self.__class__.__name__,
+                                   self.lit, self.optional, self.ends)
+
+class Designator(Literal):
+    """A designator is like a separator in that it matches itself in the
+    input string, but it also (usually) indicates a switch to a different
+    syntax."""
+
+    def __init__(self, lit, cls=None):
+        super(Designator, self).__init__(lit)
+        self.syntax_cls = cls
+
+    def execute(self, m):
+        if super(Designator, self).execute(m):
+            if not self.syntax_cls:
+                m.stack.pop() # drop designator
+
+    def complete(self, elts):
+        args = [[]]
+        for elt in elts:
+            if isinstance(elt, Separator) and \
+                    elt.lit in self.syntax_cls.separators:
+                args.append([])
+            else:
+                args[-1].append(elt)
+        if len(args) == 1:
+            args = args[0]
+        return self.syntax_cls(*args)
+
+    def __repr__(self):
+        return "%s(%r, %s)" % (self.__class__.__name__,
+                               self.lit,
+                               self.syntax_cls.__name__ if self.syntax_cls
+                                                        else None)
+
+class Coerce(Designator):
+    """Coerce the element on the top of the stack to a different type."""
+
+    def __init__(self, lit, cls):
+        super(Coerce, self).__init__(lit) # no syntax class
+        self.coerce = cls
+
+    def execute(self, m):
+        if super(Coerce, self).execute(m):
+            m.stack.pop() # drop designator
+            m.stack[-1] = self.coerce(m.stack[-1])
+
+    def __repr__(self):
+        return "%s(%r, %s)" % (self.__class__.__name__,
+                               self.lit, self.coerce.__name__)
+
+class Element(FormatOp):
+    def __init__(self, cls, min=0, max=None, signed=False):
+        self.cls = cls
+        self.min = min
+        self.max = max
+        self.signed = signed
+        self.pattern = re.compile("(%s[0-9]{%d,%s})" % \
+                                      ("[+-]" if signed else "",
+                                       self.min, self.max or ""))
+
+    def element(self, obj):
+        return getattr(obj, self.cls.__name__.lower())
+
+    def format(self, obj):
+        value = int(self.element(obj))
+        return ((("-" if value < 0 else "+") if self.signed else "") +
+                ("%0*d" % (self.min, abs(value)))[0:self.max])
+
+    def execute(self, m):
+        match = self.pattern.match(m.input[m.i:])
+        if match:
+            digits = match.group(0)
+            m.stack.append(self.cls(int(digits)))
+            m.i += len(digits)
+            return True
+
+    def __eq__(self, other):
+        return (isinstance(other, self.__class__) and
+                self.cls is other.cls and
+                self.min == other.min and
+                self.max == other.max)
+
+    def __repr__(self):
+        return "%s(%s, %s, %s, %s)" % (self.__class__.__name__,
+                                       self.cls.__name__,
+                                       self.min, self.max, self.signed)
+
+class FormatReprParser(object):
+    def __init__(self, cls, format_repr):
+        self.cls = cls
+        self.repr = re.sub(r"_(.)", ur"\1̲", format_repr) # convert _X to X̲
+
+    def __iter__(self):
+        self.i = -1
+        return self
+
+    def next(self):
+        self.i += 1
+        try:
+            return self.repr[self.i]
+        except IndexError:
+            raise StopIteration
+
+    def peek(self):
+        try:
+            return self.repr[self.i+1]
+        except IndexError:
+            pass
+
+    def designator(self, char):
+        """Match a designator in the current syntax, and possibly push a new
+        syntax."""
+        if char in self.syntax[-1].syntax_cls.designators:
+            designated = self.syntax[-1].syntax_cls.designators[char]
+            if designated is None:
+                # Just a marker: return a new designator, but don't change
+                # the syntax.
+                 return Designator(char)
+            elif issubclass(designated, TimeUnit):
+                # Postfix designator: coerce the last element to the given
+                # class.
+                return Coerce(char, designated)
+            else:
+                # A true designator: we'll construct an instance of the
+                # designated class using elements from the current position
+                # to the next separator at a higher syntax level.
+                designator = Designator(char, designated)
+                self.syntax.append(designator)
+                return designator
+
+    def separator(self, char):
+        """Match a separator at any syntax level, popping back to that level."""
+        for level, syntax in enumerate(reversed(self.syntax)):
+            if char in syntax.syntax_cls.separators:
+                return Separator(char, syntax.syntax_cls.separators[char],
+                                 [self.syntax.pop() for i in range(level)])
+
+    def element(self, char):
+        """Consume as many of the same digit-representing characters as
+        possible from the input and return an Element fop."""
+        signed = False
+        if char == u"±":
+            signed = True
+            char = self.next()
+        repeat = False
+        n = 1
+        while self.peek() == char:
+            n += 1
+            self.next()
+        if self.peek() == u"\u0332": # combining low line (underline)
+            repeat = True
+            n -= 1 # last char was underlined; don't count it
+            self.next() # discard underline
+        return Element(self.syntax[-1].syntax_cls.digits[char],
+                       n, None if repeat else n, signed)
+
+    def parse(self):
+        # Start with an empty designator for the primary syntax class.
+        self.syntax = [Designator("", self.cls)]
+        yield self.syntax[0]
+
+        for char in self:
+            print char, self.syntax
+            yield (self.designator(char) or
+                   self.separator(char) or
+                   self.element(char))
+
+        # End with an empty separator that matches all open designators.
+        yield Separator("", True,
+                        [self.syntax.pop() for i in range(len(self.syntax))])
+
+class ParseError(Exception):
+    def __init__(self, cls, i):
+        self.cls = cls
+        self.i = i
+
+    def __str__(self):
+        return "parse error: %s (char %d)" % (self.cls.__name__, self.i)
+
+class Format(object):
+    def __init__(self, cls, format_repr):
+        self.cls = cls
+        self.ops = list(FormatReprParser(cls, format_repr).parse())
+
+    def format(self, obj):
+        return "".join([op.format(obj) for op in self.ops])
+
+    def read(self, string):
+        self.input = string.upper()
+        self.i = 0
+        self.stack = []
+        ops = iter(self.ops)
+        n = len(self.input)
+        while self.i < n:
+            ops.next().execute(self)
+        self.ops[-1].execute(self) # special EOF separator
+        return self.stack
+
 class InvalidTimeUnit(Exception):
     def __init__(self, unit, value):
         self.unit = unit
@@ -18,30 +265,29 @@ class InvalidTimeUnit(Exception):
 class TimeUnit(object):
     range = (0,)
 
-    def __init__(self, value, pattern=re.compile(r"([0-9]+)")):
+    def __init__(self, value, ordinal=True, pattern=re.compile(r"([0-9]+)")):
         if isinstance(value, basestring):
             m = pattern.match(value)
             if not m:
                 raise InvalidTimeUnit(self, value)
-            super(TimeUnit, self).__setattr__("value", int(m.group(1)))
+            self.value = int(m.group(1))
         elif isinstance(value, int):
-            super(TimeUnit, self).__setattr__("value", value)
+            self.value = value
+        elif isinstance(value, TimeUnit):
+            self.value = value.value
         else:
             raise InvalidTimeUnit(self, value)
-        if not self.isvalid():
+        if ordinal and not self.isvalid():
             raise InvalidTimeUnit(self, value)
 
     def isvalid(self):
-        minvalue, maxvalue = self.range
-        if maxvalue is None:
+        """Check that an ordinal value is within the valid range."""
+        if len(self.range) == 1:
+            minvalue, = self.range
             return minvalue <= abs(self.value)
         else:
+            minvalue, maxvalue = self.range
             return minvalue <= abs(self.value) <= maxvalue
-
-    def __setattr__(self, *args):
-        raise TypeError("units of time are immutable")
-
-    __delattr__ = __setattr__
 
     def __int__(self):
         return self.value
@@ -137,14 +383,18 @@ class Minute(TimeUnit):
 class Second(TimeUnit):
     range = (0, 60) # don't forget leap seconds!
 
-class TimePoint(object):
+class TimeRep(object):
+    """Base class for the representations of time points, durations, intervals,
+    and recurring intervals."""
+
     __metaclass__ = SlotMerger
-    __merge__ = ["designators", "separators", "digits"]
+    __merge__ = ["digits", "designators", "separators"]
 
-    designators = []
-    separators = []
     digits = {}
+    designators = {}
+    separators = {}
 
+class TimePoint(TimeRep):
     def check_accuracy(self, *elements):
         """Given a list of elements in most-significant-first order, check
         for legitimate omissions. Omission of an element is allowed only if
@@ -160,8 +410,10 @@ class TimePoint(object):
         self.reduced_accuracy |= lse < len(elements) - 1
 
 class Date(TimePoint):
-    separators = [u"-", # hyphen-minus (a.k.a. ASCII hyphen, U+002D)
-                  u"‐"] # hyphen (U+2010)
+    digits = {"Y": Year, "M": Month, "D": Day, "w": Week}
+    designators = {"W": None}
+    separators = {u"-": True, # hyphen-minus (a.k.a. ASCII hyphen, U+002D)
+                  u"‐": True} # hyphen (U+2010)
 
 class CalendarDate(Date):
     digits = {"Y": Year, "M": Month, "D": DayOfMonth}
@@ -183,6 +435,7 @@ class OrdinalDate(Date):
 
 class WeekDate(Date):
     digits = {"Y": Year, "w": Week, "D": DayOfWeek}
+    designators = {"W": None}
 
     @units(Year, Week, Day)
     def __init__(self, year, week=None, day=None):
@@ -191,7 +444,8 @@ class WeekDate(Date):
 
 class Time(TimePoint):
     digits = {"h": Hour, "m": Minute, "s": Second}
-    separators = [":"]
+    designators = {"T": None}
+    separators = {":": True}
 
     @units(Hour, Minute, Second, None)
     def __init__(self, hour, minute=None, second=None, offset=None):
@@ -212,17 +466,22 @@ class UTCOffset(TimePoint):
 
 UTC = UTCOffset(0)
 
-class DateTime(TimePoint):
-    designators = ["T"]
+class DateTime(Date, Time):
+    designators = {"T": Time}
 
-    def __init__(self, date, time):
-        assert date is None or isinstance(date, Date)
-        assert time is None or isinstance(time, Time)
-        self.date = date
-        self.time = time
-        if time and date and date.reduced_accuracy:
+    def __init__(self, *args):
+        if isinstance(args[-1], Time):
+            self.time = args[-1]
+            args = args[0:-1]
+        if any(map(lambda x: isinstance(x, DayOfYear), args)):
+            self.date = OrdinalDate(*args)
+        elif any(map(lambda x: isinstance(x, Week), args)):
+            self.date = WeekDate(*args)
+        else:
+            self.date = CalendarDate(*args)
+        if self.time and self.date and self.date.reduced_accuracy:
             raise ValueError("can't have time with an incomplete date")
-        super(UTCOffset, self).check_accuracy(self.date, self.time)
+        super(DateTime, self).check_accuracy(self.date, self.time)
 
 class CalendarDateTime(DateTime, CalendarDate, Time):
     def __init__(self, year, month=None, day=None,
@@ -242,22 +501,39 @@ class WeekDateTime(DateTime, WeekDate, Time):
         WeekDate.__init__(self, year, week, day)
         Time.__init__(self, hour, minute, second, offset)
 
-class Duration(object):
-    def __init__(self, years=0, months=0, days=0,
-                 hours=0, minutes=0, seconds=0,
-                 weeks=None):
+class TimeDuration(TimeRep):
+    digits = {"n": TimeUnit}
+    designators = {"H": Hour, "M": Minute, "S": Second}
+
+    @units(Hour, Minute, Second)
+    def __init__(self, hours=0, minutes=0, seconds=0):
+        self.hours = hours
+        self.minutes = minutes
+        self.seconds = seconds
+
+class Duration(TimeRep):
+    digits = {"n": TimeUnit}
+    designators = {"W": Week, "Y": Year, "M": Month, "D": Day,
+                   "T": TimeDuration}
+
+    def __init__(self, years=0, months=0, days=0, time=None, weeks=None):
         if weeks is not None:
             self.weeks = weeks
         else:
             self.years = years
             self.months = months
             self.days = days
-            self.hours = hours
-            self.minutes = minutes
-            self.seconds = seconds
+            self.time = time
 
-class TimeInterval(object):
+class TimeInterval(DateTime):
+    designators = {"P": Duration}
+    separators = {"/": False}
+
     def __init__(self, *args):
+        self.start = args[0]
+        self.end = args[1]
+        return
+
         assert len(args) <= 2
         if len(args) == 1:
             if isinstance(args[0], Duration):
@@ -277,138 +553,12 @@ class TimeInterval(object):
         else:
             raise ValueError("invalid interval: %s" % (args,))
 
-class RecurringTimeInterval(object):
-    def __init__(self, n, interval):
+class RecurringTimeInterval(TimeInterval):
+    digits = {"n": int}
+    designators = {"R": None}
+
+    def __init__(self, n, *args):
         if n is not None and n < 0:
-            raise TypeError("invalid number of reccurrences %d" % n)
-        if not isinstance(interval, TimeInterval):
-            raise TypeError("invalid interval %s" % interval)
+            raise ValueError("invalid number of recurrences %d" % n)
         self.n = n
-        self.interval = interval
-
-class FormatOp(object):
-    pass
-
-class Character(FormatOp):
-    def __init__(self, char):
-        self.char = char
-
-    def format(self, obj):
-        return self.char
-
-    def read(self, string, start):
-        if string[start] == self.char:
-            return (self.char, start+1)
-        else:
-            return (None, start)
-
-    def __eq__(self, other):
-        return isinstance(other, self.__class__) and self.char == other.char
-
-    def __repr__(self):
-        return "%s(%s)" % (self.__class__.__name__, self.char)
-
-class Designator(Character):
-    pass
-
-class Separator(Character):
-    pass
-
-class Element(FormatOp):
-    def __init__(self, cls, min=0, max=None, signed=False):
-        self.cls = cls
-        self.min = min
-        self.max = max
-        self.signed = signed
-        self.pattern = re.compile("(%s[0-9]{%d,%s})" % \
-                                      ("[+-]" if signed else "",
-                                       self.min, self.max or ""))
-
-    def element(self, obj):
-        return getattr(obj, self.cls.__name__.lower())
-
-    def format(self, obj):
-        value = int(self.element(obj))
-        return ((("-" if value < 0 else "+") if self.signed else "") +
-                ("%0*d" % (self.min, abs(value)))[0:self.max])
-
-    def read(self, string, start):
-        match = self.pattern.match(string[start:])
-        if match:
-            digits = match.group(0)
-            return (self.cls(int(digits)), start + len(digits))
-        else:
-            return (None, start)
-
-    def __eq__(self, other):
-        return (isinstance(other, self.__class__) and
-                self.cls is other.cls and
-                self.min == other.min and
-                self.max == other.max)
-
-    def __repr__(self):
-        return "%s(%s, %d, %d, %s)" % (self.__class__.__name__,
-                                       self.cls.__name__, self.min, self.max,
-                                       self.signed)
-
-def parse_format_repr(cls, format_repr):
-    i = peekable(format_repr)
-    def getop(c):
-        if c in cls.designators:
-            return Designator(c)
-        elif c in cls.separators:
-            return Separator(c)
-        elif c == "_":
-            return Element(cls.digits[i.next()])
-        else:
-            signed = False
-            if c == u"±":
-                signed = True
-                c = i.next()
-            n = 1
-            try:
-                while i.peek() == c:
-                    n += 1
-                    i.next()
-                if i.peek() == u"\u0332": # combining low line (underline)
-                    i.next() # discard underline
-                    return Element(cls.digits[c], n-1, None, signed)
-                elif i.peek(2) == ["_", c]:
-                    i.next(2) # discard underline and char
-                    return Element(cls.digits[c], n, None, signed)
-            except StopIteration:
-                pass
-            return Element(cls.digits[c], n, n, signed)
-    try:
-        while True:
-            yield getop(i.next())
-    except StopIteration:
-        pass
-
-class ParseError(Exception):
-    def __init__(self, cls, i):
-        self.cls = cls
-        self.i = i
-
-    def __str__(self):
-        return "parse error: %s (char %d)" % (self.cls.__name__, self.i)
-
-class Format(object):
-    def __init__(self, cls, format_repr):
-        self.cls = cls
-        self.ops = list(parse_format_repr(cls, format_repr))
-
-    def format(self, obj):
-        return "".join([op.format(obj) for op in self.ops])
-
-    def read(self, string):
-        i = 0
-        elements = []
-        ops = iter(self.ops)
-        while i < len(string):
-            x, i = ops.next().read(string, i)
-            if x is None:
-                raise ParseError(self.cls, i)
-            elif isinstance(x, TimeUnit):
-                elements.append(x)
-        return self.cls(*elements)
+        super(RecurringTimeInterval, self).__init__(*args)
