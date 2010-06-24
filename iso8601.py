@@ -524,28 +524,27 @@ class TimeInterval(DateTime):
     separators = {"/": False}
 
     def __init__(self, *args):
-        self.start = args[0]
-        self.end = args[1]
-        return
-
-        assert len(args) <= 2
+        assert len(args) <= 2, "too many end-points for a time interval"
         if len(args) == 1:
             if isinstance(args[0], Duration):
                 # 4.4.1 b) a duration and context information
                 self.duration = args[0]
             else:
                 raise ValueError("invalid interval: %s" % (args,))
-        elif isinstance(args[0], DateTime) and isinstance(args[1], DateTime):
-            # 4.4.1 a) a start and an end
-            self.start, self.end = args
-        elif isinstance(args[0], DateTime) and isinstance(args[1], Duration):
-            # 4.4.1 c) a start and a duration
-            self.start, self.duration = args
-        elif isinstance(args[0], Duration) and isinstance(args[1], DateTime):
-            # 4.4.1 d) a duration and an end
-            self.duration, self.end = args
         else:
-            raise ValueError("invalid interval: %s" % (args,))
+            for i, point in (0, "start"), (1, "end"):
+                # Because of the way the Format machinery works, a date and
+                # time might be passed as a sequence instead of a DateTime
+                # instance; we'll construct one if that's the case.
+                if isinstance(args[i], (list, tuple)):
+                    setattr(self, point, DateTime(*args[i]))
+                elif isinstance(args[i], DateTime):
+                    setattr(self, point, args[i])
+                elif isinstance(args[i], Duration) and \
+                        not hasattr(self, "duration"):
+                    self.duration = args[i]
+                else:
+                    raise ValueError("invalid interval: %s" % (args,))
 
 class RecurringTimeInterval(TimeInterval):
     digits = {"n": int}
