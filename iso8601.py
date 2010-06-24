@@ -225,14 +225,6 @@ class FormatReprParser(object):
         yield Separator("", True,
                         [self.syntax.pop() for i in range(len(self.syntax))])
 
-class ParseError(Exception):
-    def __init__(self, cls, i):
-        self.cls = cls
-        self.i = i
-
-    def __str__(self):
-        return "parse error: %s (char %d)" % (self.cls.__name__, self.i)
-
 class Format(object):
     def __init__(self, cls, format_repr):
         self.cls = cls
