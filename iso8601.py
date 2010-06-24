@@ -217,7 +217,6 @@ class FormatReprParser(object):
         yield self.syntax[0]
 
         for char in self:
-            print char, self.syntax
             yield (self.designator(char) or
                    self.separator(char) or
                    self.element(char))
