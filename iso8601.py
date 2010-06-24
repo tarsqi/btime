@@ -410,7 +410,7 @@ class TimePoint(TimeRep):
 
 class Date(TimePoint):
     digits = {"Y": Year, "M": Month, "D": Day, "w": Week}
-    designators = {"W": None}
+    designators = {"W": None} # for week date
     separators = {u"-": True, # hyphen-minus (a.k.a. ASCII hyphen, U+002D)
                   u"‐": True} # hyphen (U+2010)
 
@@ -434,7 +434,6 @@ class OrdinalDate(Date):
 
 class WeekDate(Date):
     digits = {"Y": Year, "w": Week, "D": DayOfWeek}
-    designators = {"W": None}
 
     @units(Year, Week, Day)
     def __init__(self, year, week=None, day=None):
@@ -470,17 +469,23 @@ class DateTime(Date, Time):
 
     def __init__(self, *args):
         if isinstance(args[-1], Time):
-            self.time = args[-1]
+            time = args[-1]
             args = args[0:-1]
         if any(map(lambda x: isinstance(x, DayOfYear), args)):
-            self.date = OrdinalDate(*args)
+            date = OrdinalDate(*args)
+            self.__class__ = OrdinalDateTime
+            self.__init__(date.year, date.day,
+                          time.hour, time.minute, time.second, time.offset)
         elif any(map(lambda x: isinstance(x, Week), args)):
-            self.date = WeekDate(*args)
+            date = WeekDate(*args)
+            self.__class__ = WeekDateTime
+            self.__init__(date.year, date.week, date.day,
+                          time.hour, time.minute, time.second, time.offset)
         else:
-            self.date = CalendarDate(*args)
-        if self.time and self.date and self.date.reduced_accuracy:
-            raise ValueError("can't have time with an incomplete date")
-        super(DateTime, self).check_accuracy(self.date, self.time)
+            date = CalendarDate(*args)
+            self.__class__ = CalendarDateTime
+            self.__init__(date.year, date.month, date.day,
+                          time.hour, time.minute, time.second, time.offset)
 
 class CalendarDateTime(DateTime, CalendarDate, Time):
     def __init__(self, year, month=None, day=None,
