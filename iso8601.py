@@ -411,26 +411,24 @@ class CalendarDate(Date):
 
     @units(Year, Month, DayOfMonth)
     def __init__(self, year, month=None, day=None):
+        super(CalendarDate, self).check_accuracy(year, month, day)
         self.year, self.month, self.day = year, month, day
-        super(CalendarDate, self).check_accuracy(self.year,
-                                                 self.month,
-                                                 self.day)
 
 class OrdinalDate(Date):
     digits = {"Y": Year, "D": DayOfYear}
 
     @units(Year, DayOfYear)
     def __init__(self, year, day=None):
+        super(OrdinalDate, self).check_accuracy(year, day)
         self.year, self.day = year, day
-        super(OrdinalDate, self).check_accuracy(self.year, self.day)
 
 class WeekDate(Date):
     digits = {"Y": Year, "w": Week, "D": DayOfWeek}
 
     @units(Year, Week, Day)
     def __init__(self, year, week=None, day=None):
+        super(WeekDate, self).check_accuracy(year, week, day)
         self.year, self.week, self.day = year, week, day
-        super(WeekDate, self).check_accuracy(self.year, self.week, self.day)
 
 class Time(TimePoint):
     digits = {"h": Hour, "m": Minute, "s": Second}
@@ -439,20 +437,20 @@ class Time(TimePoint):
 
     @units(Hour, Minute, Second, None)
     def __init__(self, hour, minute=None, second=None, offset=None):
+        super(Time, self).check_accuracy(hour, minute, second)
         self.hour, self.minute, self.second = hour, minute, second
         if offset is None or isinstance(offset, UTCOffset):
             self.offset = offset
         else:
             raise TypeError("invalid offset from UTC: %s" % offset)
-        super(Time, self).check_accuracy(self.hour, self.minute, self.second)
 
 class UTCOffset(TimePoint):
     digits = {"h": Hour, "m": Minute}
 
     @units(Hour, Minute)
     def __init__(self, hour=0, minute=None):
+        super(UTCOffset, self).check_accuracy(hour, minute)
         self.hour, self.minute = hour, minute
-        super(UTCOffset, self).check_accuracy(self.hour, self.minute)
 
 UTC = UTCOffset(0)
 
