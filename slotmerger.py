@@ -4,9 +4,9 @@ class SlotMerger(type):
     """A metaclass that implements class-slot merging.
 
     Compound data structures (dict-like or list-like) stored in slots whose
-    names are members of the list stored in the __merge__ slot will be
+    names are members of the list stored in the __mergeslots__ slot will be
     merged with the values of the same-named slots in each of the class's
-    ancestors.  The __merge__ slot is always merged."""
+    ancestors.  The __mergeslots__ slot is always merged."""
 
     def __init__(cls, name, bases, dict):
         def inherited_slot_values(slot):
@@ -44,19 +44,19 @@ class SlotMerger(type):
             return x
 
         super(SlotMerger, cls).__init__(name, bases, dict)
-        setattr(cls, "__merge__", merge_slot_values("__merge__"))
-        for slot in getattr(cls, "__merge__"):
+        setattr(cls, "__mergeslots__", merge_slot_values("__mergeslots__"))
+        for slot in getattr(cls, "__mergeslots__"):
             setattr(cls, slot, merge_slot_values(slot))
 
 if __name__ == "__main__":
     class A(object):
         __metaclass__ = SlotMerger
-        __merge__ = ['foo']
+        __mergeslots__ = ['foo']
         foo = {'a': 1, 'b': -1}
         bar = ['abc']
 
     class B(A):
-        __merge__ = ['bar']
+        __mergeslots__ = ['bar']
         foo = {'b': 2}
         bar = ['doe', 're', 'mi']
 

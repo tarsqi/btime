@@ -9,23 +9,21 @@ class StopFormat(Exception):
     pass
 
 class FormatOp(object):
-    """FormatOps, or fops, are the operations of a teeny-tiny virtual machine.
-    The state of a machine is completely described by a stack of components,
-    an input string, and a position in the input."""
+    def format(self, m):
+        return ""
 
-    def execute(self, m):
+    def read(self, m):
         raise StopFormat(m)
 
 class Literal(FormatOp):
     def __init__(self, lit):
         self.lit = lit.upper()
 
-    def format(self, obj):
+    def format(self, m):
         return self.lit
 
-    def execute(self, m):
+    def read(self, m):
         if not self.lit or m.input.startswith(self.lit, m.i):
-            m.stack.append(self)
             m.i += len(self.lit)
             return True
 
@@ -37,76 +35,31 @@ class Literal(FormatOp):
         return "%s(%r)" % (self.__class__.__name__, self.lit)
 
 class Separator(Literal):
-    def __init__(self, lit, optional, ends):
-        super(Separator, self).__init__(lit)
-        self.optional = optional
-        self.ends = ends
-
-    def execute(self, m):
-        if super(Separator, self).execute(m):
-            m.stack.pop() # drop separator, maybe temporarily
-            for d in self.ends:
-                for i, x in enumerate(reversed(m.stack)):
-                    if x is d:
-                        m.stack[-i-1:] = [d.complete(m.stack[-i:])]
-                        break
-            if not self.optional:
-                m.stack.append(self) # put separator back
-
-    def __repr__(self):
-        return "%s(%r, %r, %r)" % (self.__class__.__name__,
-                                   self.lit, self.optional, self.ends)
+    def format(self, m):
+        m.separators.append(super(Separator, self).format(m))
 
 class Designator(Literal):
-    """A designator is like a separator in that it matches itself in the
-    input string, but it also (usually) indicates a switch to a different
-    syntax."""
-
-    def __init__(self, lit, cls=None):
-        super(Designator, self).__init__(lit)
-        self.syntax_cls = cls
-
-    def execute(self, m):
-        if super(Designator, self).execute(m):
-            if not self.syntax_cls:
-                m.stack.pop() # drop designator
-
-    def complete(self, elts):
-        args = [[]]
-        for elt in elts:
-            if isinstance(elt, Separator) and \
-                    elt.lit in self.syntax_cls.separators:
-                args.append([])
-            else:
-                args[-1].append(elt)
-        if len(args) == 1:
-            args = args[0]
-        return self.syntax_cls(*args)
-
-    def __repr__(self):
-        return "%s(%r, %s)" % (self.__class__.__name__,
-                               self.lit,
-                               self.syntax_cls.__name__ if self.syntax_cls
-                                                        else None)
+    pass
 
 class Coerce(Designator):
-    """Coerce the element on the top of the stack to a different type."""
+    def read(self, m):
+        """Coerce the element on the top of the stack to a different type."""
+        if super(Coerce, self).read(m):
+            m.stack[-1] = self.cls(m.stack[-1])
 
-    def __init__(self, lit, cls):
-        super(Coerce, self).__init__(lit) # no syntax class
-        self.coerce = cls
+class UTCDesignator(Designator):
+    def __init__(self):
+        super(UTCDesignator, self).__init__("Z")
 
-    def execute(self, m):
-        if super(Coerce, self).execute(m):
-            m.stack.pop() # drop designator
-            m.stack[-1] = self.coerce(m.stack[-1])
+    def read(self, m):
+        if super(Designator, self).read(m):
+            m.stack.append(UTC)
 
-    def __repr__(self):
-        return "%s(%r, %s)" % (self.__class__.__name__,
-                               self.lit, self.coerce.__name__)
+Z = UTCDesignator()
 
 class Element(FormatOp):
     def __init__(self, cls, min=0, max=None, signed=False):
+        assert issubclass(cls, TimeUnit)
         self.cls = cls
         self.min = min
         self.max = max
@@ -115,19 +68,19 @@ class Element(FormatOp):
                                       ("[+-]" if signed else "",
                                        self.min, self.max or ""))
 
-    def element(self, obj):
-        return getattr(obj, self.cls.__name__.lower())
+    def format(self, m):
+        elt = m.i.next()
+        if elt:
+            value = int(elt)
+            return ((m.separators.pop() if m.separators else "") +
+                    (("-" if value < 0 else "+") if self.signed else "") +
+                    ("%0*d" % (self.min, abs(value)))[0:self.max])
 
-    def format(self, obj):
-        value = int(self.element(obj))
-        return ((("-" if value < 0 else "+") if self.signed else "") +
-                ("%0*d" % (self.min, abs(value)))[0:self.max])
-
-    def execute(self, m):
+    def read(self, m):
         match = self.pattern.match(m.input[m.i:])
         if match:
             digits = match.group(0)
-            m.stack.append(self.cls(int(digits)))
+            m.stack.append(self.cls(int(digits), signed=self.signed))
             m.i += len(digits)
             return True
 
@@ -165,36 +118,28 @@ class FormatReprParser(object):
             pass
 
     def designator(self, char):
-        """Match a designator in the current syntax, and possibly push a new
-        syntax."""
-        if char in self.syntax[-1].syntax_cls.designators:
-            designated = self.syntax[-1].syntax_cls.designators[char]
-            if designated is None:
-                # Just a marker: return a new designator, but don't change
-                # the syntax.
-                 return Designator(char)
-            elif issubclass(designated, TimeUnit):
-                # Postfix designator: coerce the last element to the given
-                # class.
-                return Coerce(char, designated)
+        if char in self.syntax.designators:
+            designate = self.syntax.designators[char]
+            if designate and issubclass(designate, TimeUnit):
+                # Postfix designator: coerce the last element.
+                return Coerce(char, designate)
+            elif designate is UTCDesignator:
+                return Z
             else:
-                # A true designator: we'll construct an instance of the
-                # designated class using elements from the current position
-                # to the next separator at a higher syntax level.
-                designator = Designator(char, designated)
-                self.syntax.append(designator)
-                return designator
+                if designate:
+                    self.stack.append(designate) # push new syntax class
+                return Designator(char)
 
     def separator(self, char):
-        """Match a separator at any syntax level, popping back to that level."""
-        for level, syntax in enumerate(reversed(self.syntax)):
-            if char in syntax.syntax_cls.separators:
-                return Separator(char, syntax.syntax_cls.separators[char],
-                                 [self.syntax.pop() for i in range(level)])
+        for level, cls in enumerate(reversed(self.stack)):
+            if char in cls.separators:
+                for i in range(level):
+                    self.stack.pop()
+                return Separator(char)
 
     def element(self, char):
         """Consume as many of the same digit-representing characters as
-        possible from the input and return an Element fop."""
+        possible from the format representation and return an Element fop."""
         signed = False
         if char == u"±":
             signed = True
@@ -208,30 +153,35 @@ class FormatReprParser(object):
             repeat = True
             n -= 1 # last char was underlined; don't count it
             self.next() # discard underline
-        return Element(self.syntax[-1].syntax_cls.digits[char],
+        return Element(self.syntax.digits[char],
                        n, None if repeat else n, signed)
 
-    def parse(self):
-        # Start with an empty designator for the primary syntax class.
-        self.syntax = [Designator("", self.cls)]
-        yield self.syntax[0]
+    @property
+    def syntax(self):
+        return self.stack[-1]
 
+    def parse(self):
+        self.stack = [self.cls] # syntax stack
         for char in self:
             yield (self.designator(char) or
                    self.separator(char) or
                    self.element(char))
-
-        # End with an empty separator that matches all open designators.
-        yield Separator("", True,
-                        [self.syntax.pop() for i in range(len(self.syntax))])
 
 class Format(object):
     def __init__(self, cls, format_repr):
         self.cls = cls
         self.ops = list(FormatReprParser(cls, format_repr).parse())
 
-    def format(self, obj):
-        return "".join([op.format(obj) for op in self.ops])
+    def format(self, timerep):
+        self.separators = []
+        self.i = iter(timerep)
+        return "".join(filter(None, [op.format(self) for op in self.ops]))
+
+    def merge_top(self):
+        merged = self.stack[-2].merge(self.stack[-1])
+        if merged:
+            self.stack[-2:] = [merged]
+            return merged
 
     def read(self, string):
         self.input = string.upper()
@@ -240,9 +190,13 @@ class Format(object):
         ops = iter(self.ops)
         n = len(self.input)
         while self.i < n:
-            ops.next().execute(self)
-        self.ops[-1].execute(self) # special EOF separator
-        return self.stack
+            ops.next().read(self)
+            if len(self.stack) > 1:
+                self.merge_top()
+        while len(self.stack) > 1:
+            if not self.merge_top():
+                raise StopFormat(self)
+        return self.stack[0]
 
 class InvalidTimeUnit(Exception):
     def __init__(self, unit, value):
@@ -256,15 +210,19 @@ class InvalidTimeUnit(Exception):
 class TimeUnit(object):
     range = (0,)
 
-    def __init__(self, value, ordinal=True, pattern=re.compile(r"([0-9]+)")):
+    def __init__(self, value, ordinal=True, signed=None,
+                 pattern=re.compile(r"([+-])?([0-9]+)")):
         if isinstance(value, basestring):
             m = pattern.match(value)
             if not m:
                 raise InvalidTimeUnit(self, value)
-            self.value = int(m.group(1))
+            self.signed = m.group(1)
+            self.value = int((self.signed if self.signed else "") + m.group(2))
         elif isinstance(value, int):
+            self.signed = signed
             self.value = value
         elif isinstance(value, TimeUnit):
+            self.signed = value.signed
             self.value = value.value
         else:
             raise InvalidTimeUnit(self, value)
@@ -339,13 +297,21 @@ def units(*units):
     have the correct units."""
     def ensure_arg_units(method):
         @wraps(method)
-        def wrapper(self, *args):
-            return method(self, *map(ensure_class, args, units))
+        def wrapper(self, *args, **kwargs):
+            return method(self, *map(ensure_class, args, units), **kwargs)
         return wrapper
     return ensure_arg_units
 
 class Year(TimeUnit):
     range = (0, 9999)
+
+    def merge(self, other):
+        if isinstance(other, Month):
+            return CalendarDate(self, other)
+        elif isinstance(other, Week):
+            return WeekDate(self, other)
+        elif isinstance(other, Day):
+            return OrdinalDate(self, other)
 
 class Month(TimeUnit):
     range = (1, 12)
@@ -368,24 +334,88 @@ class DayOfWeek(Day):
 class Hour(TimeUnit):
     range = (0, 24)
 
+    def merge(self, other):
+        if isinstance(other, Minute):
+            if self.signed:
+                return UTCOffset(self, other)
+            else:
+                return Time(self, other)
+
 class Minute(TimeUnit):
     range = (0, 59)
 
 class Second(TimeUnit):
     range = (0, 60) # don't forget leap seconds!
+
+class Cardinal(TimeUnit):
+    def __init__(self, value):
+        super(Cardinal, self).__init__(value, False)
+
+class Years(Cardinal, Year):
+    def merge(self, other):
+        if isinstance(other, Months):
+            return Duration(self, other)
+
+class Months(Cardinal, Month):
+    pass
+
+class Weeks(Cardinal, Week):
+    pass
+
+class Days(Cardinal, Day):
+    pass
+
+class Hours(Cardinal, Hour):
+    def merge(self, other):
+        if isinstance(other, Minutes):
+            return TimeDuration(self, other)
+
+class Minutes(Cardinal, Minute):
+    pass
+
+class Seconds(Cardinal, Second):
+    pass
 
 class TimeRep(object):
     """Base class for the representations of time points, durations, intervals,
     and recurring intervals."""
 
     __metaclass__ = SlotMerger
-    __merge__ = ["digits", "designators", "separators"]
+    __mergeslots__ = ["digits", "designators", "separators"]
 
     digits = {}
     designators = {}
-    separators = {}
+    separators = []
+
+    def __init__(self, *args):
+        self.elements = list(args)
+
+    def __getattr__(self, name):
+        for elt in self.elements:
+            if any(c.__name__.lower() == name for c in elt.__class__.__mro__):
+                setattr(self, name, elt) # cache for future lookups
+                return elt
+        for elt in self.elements:
+            if isinstance(elt, TimeRep):
+                attr = getattr(elt, name, None)
+                if attr:
+                    return attr
+        raise AttributeError("'%s' representation has no element '%s'" % \
+                                 (self.__class__.__name__, name))
+
+    def __iter__(self):
+        for elt in self.elements:
+            if isinstance(elt, TimeRep):
+                for x in elt:
+                    yield x
+            else:
+                yield elt
 
 class TimePoint(TimeRep):
+    def __init__(self, *args):
+        self.check_accuracy(*args)
+        super(TimePoint, self).__init__(*args)
+
     def check_accuracy(self, *elements):
         """Given a list of elements in most-significant-first order, check
         for legitimate omissions. Omission of an element is allowed only if
@@ -396,135 +426,134 @@ class TimePoint(TimeRep):
                 raise ValueError("invalid date/time accuracy reduction")
             elif elt and lse < 0:
                 lse = i
-        if not hasattr(self, "reduced_accuracy"):
-            self.reduced_accuracy = False
-        self.reduced_accuracy |= lse < len(elements) - 1
+        self.reduced_accuracy = lse < len(elements) - 1
 
 class Date(TimePoint):
     digits = {"Y": Year, "M": Month, "D": Day, "w": Week}
     designators = {"W": None} # for week date
-    separators = {u"-": True, # hyphen-minus (a.k.a. ASCII hyphen, U+002D)
-                  u"‐": True} # hyphen (U+2010)
+    separators = [u"-", # hyphen-minus (a.k.a. ASCII hyphen, U+002D)
+                  u"‐"] # hyphen (U+2010)
+
+    def merge(self, other):
+        if isinstance(other, Time):
+            return DateTime(self, other)
+        elif isinstance(other, Hour):
+            return DateTime(self, Time(other))
 
 class CalendarDate(Date):
     digits = {"Y": Year, "M": Month, "D": DayOfMonth}
 
     @units(Year, Month, DayOfMonth)
-    def __init__(self, year, month=None, day=None):
-        super(CalendarDate, self).check_accuracy(year, month, day)
-        self.year, self.month, self.day = year, month, day
+    def __init__(self, *args):
+        super(CalendarDate, self).__init__(*args)
+
+    def merge(self, other):
+        if isinstance(other, Month):
+            return CalendarDate(self.year, other)
+        elif isinstance(other, Day):
+            return CalendarDate(self.year, self.month, other)
+        else:
+            return super(CalendarDate, self).merge(other)
 
 class OrdinalDate(Date):
     digits = {"Y": Year, "D": DayOfYear}
 
     @units(Year, DayOfYear)
-    def __init__(self, year, day=None):
-        super(OrdinalDate, self).check_accuracy(year, day)
-        self.year, self.day = year, day
+    def __init__(self, *args):
+        super(OrdinalDate, self).__init__(*args)
+
+    def merge(self, other):
+        if isinstance(other, Day):
+            return OrdinalDate(self.year, other)
+        else:
+            return super(OrdinalDate, self).merge(other)
 
 class WeekDate(Date):
     digits = {"Y": Year, "w": Week, "D": DayOfWeek}
 
     @units(Year, Week, Day)
-    def __init__(self, year, week=None, day=None):
-        super(WeekDate, self).check_accuracy(year, week, day)
-        self.year, self.week, self.day = year, week, day
+    def __init__(self, *args):
+        super(WeekDate, self).__init__(*args)
+
+    def merge(self, other):
+        if isinstance(other, Week):
+            return WeekDate(self.year, other)
+        elif isinstance(other, Day):
+            return WeekDate(self.year, self.week, other)
+        else:
+            return super(WeekDate, self).merge(other)
 
 class Time(TimePoint):
     digits = {"h": Hour, "m": Minute, "s": Second}
-    designators = {"T": None}
-    separators = {":": True}
+    designators = {"T": None, "Z": UTCDesignator}
+    separators = [":"]
 
     @units(Hour, Minute, Second, None)
-    def __init__(self, hour, minute=None, second=None, offset=None):
-        super(Time, self).check_accuracy(hour, minute, second)
-        self.hour, self.minute, self.second = hour, minute, second
-        if offset is None or isinstance(offset, UTCOffset):
+    def __init__(self, hour=None, minute=None, second=None, offset=None):
+        super(Time, self).__init__(hour, minute, second)
+        if offset is not None and isinstance(offset, UTCOffset):
             self.offset = offset
-        else:
-            raise TypeError("invalid offset from UTC: %s" % offset)
+            self.elements += [self.offset]
+
+    def merge(self, other):
+        if isinstance(other, Minute):
+            return Time(self.hour, other, None,
+                        self.offset if hasattr(self, "offset") else None)
+        elif isinstance(other, Second):
+            return Time(self.hour, self.minute, other,
+                        self.offset if hasattr(self, "offset") else None)
+        elif isinstance(other, UTCOffset):
+            return Time(self.hour, self.minute, self.second, other)
 
 class UTCOffset(TimePoint):
     digits = {"h": Hour, "m": Minute}
 
     @units(Hour, Minute)
     def __init__(self, hour=0, minute=None):
-        super(UTCOffset, self).check_accuracy(hour, minute)
-        self.hour, self.minute = hour, minute
+        super(UTCOffset, self).__init__(hour, minute)
 
 UTC = UTCOffset(0)
 
 class DateTime(Date, Time):
     designators = {"T": Time}
 
-    def __init__(self, *args):
-        if isinstance(args[-1], Time):
-            time = args[-1]
-            args = args[0:-1]
-        if any(map(lambda x: isinstance(x, DayOfYear), args)):
-            date = OrdinalDate(*args)
-            self.__class__ = OrdinalDateTime
-            self.__init__(date.year, date.day,
-                          time.hour, time.minute, time.second, time.offset)
-        elif any(map(lambda x: isinstance(x, Week), args)):
-            date = WeekDate(*args)
-            self.__class__ = WeekDateTime
-            self.__init__(date.year, date.week, date.day,
-                          time.hour, time.minute, time.second, time.offset)
-        else:
-            date = CalendarDate(*args)
-            self.__class__ = CalendarDateTime
-            self.__init__(date.year, date.month, date.day,
-                          time.hour, time.minute, time.second, time.offset)
+    @units(Date, Time)
+    def __init__(self, date, time):
+        TimeRep.__init__(self, date, time)
 
-class CalendarDateTime(DateTime, CalendarDate, Time):
-    def __init__(self, year, month=None, day=None,
-                 hour=None, minute=None, second=None, offset=None):
-        CalendarDate.__init__(self, year, month, day)
-        Time.__init__(self, hour, minute, second, offset)
+    def merge(self, other):
+        if isinstance(other, (Hour, Minute, Second)):
+            return DateTime(self.date, self.time.merge(other))
+        elif isinstance(other, DateTime):
+            return TimeInterval(self, other)
 
-class OrdinalDateTime(DateTime, OrdinalDate, Time):
-    def __init__(self, year, day=None,
-                 hour=None, minute=None, second=None, offset=None):
-        OrdinalDate.__init__(self, year, day)
-        Time.__init__(self, hour, minute, second, offset)
-
-class WeekDateTime(DateTime, WeekDate, Time):
-    def __init__(self, year, week=None, day=None,
-                 hour=None, minute=None, second=None, offset=None):
-        WeekDate.__init__(self, year, week, day)
-        Time.__init__(self, hour, minute, second, offset)
-
 class TimeDuration(TimeRep):
     digits = {"n": TimeUnit}
-    designators = {"H": Hour, "M": Minute, "S": Second}
+    designators = {"H": Hours, "M": Minutes, "S": Seconds}
 
-    @units(Hour, Minute, Second)
+    @units(Hours, Minutes, Seconds)
     def __init__(self, hours=0, minutes=0, seconds=0):
-        self.hours = hours
-        self.minutes = minutes
-        self.seconds = seconds
+        super(TimeDuration, self).__init__(hours, minutes, seconds)
 
 class Duration(TimeRep):
     digits = {"n": TimeUnit}
-    designators = {"W": Week, "Y": Year, "M": Month, "D": Day,
+    designators = {"W": Weeks, "Y": Years, "M": Months, "D": Days,
                    "T": TimeDuration}
 
-    def __init__(self, years=0, months=0, days=0, time=None, weeks=None):
+    @units(Years, Months, Days, Weeks)
+    def __init__(self, years=0, months=0, days=0, weeks=None, time=None):
         if weeks is not None:
-            self.weeks = weeks
+            super(Duration, self).__init__(weeks)
         else:
-            self.years = years
-            self.months = months
-            self.days = days
-            self.time = time
+            super(Duration, self).__init__(years, months, days, time)
 
 class TimeInterval(DateTime):
     designators = {"P": Duration}
-    separators = {"/": False}
+    separators = ["/"]
 
     def __init__(self, *args):
         assert len(args) <= 2, "too many end-points for a time interval"
+        self.elements = args
         if len(args) == 1:
             if isinstance(args[0], Duration):
                 # 4.4.1 b) a duration and context information
@@ -533,15 +562,9 @@ class TimeInterval(DateTime):
                 raise ValueError("invalid interval: %s" % (args,))
         else:
             for i, point in (0, "start"), (1, "end"):
-                # Because of the way the Format machinery works, a date and
-                # time might be passed as a sequence instead of a DateTime
-                # instance; we'll construct one if that's the case.
-                if isinstance(args[i], (list, tuple)):
-                    setattr(self, point, DateTime(*args[i]))
-                elif isinstance(args[i], DateTime):
+                if isinstance(args[i], DateTime):
                     setattr(self, point, args[i])
-                elif isinstance(args[i], Duration) and \
-                        not hasattr(self, "duration"):
+                elif isinstance(args[i], Duration):
                     self.duration = args[i]
                 else:
                     raise ValueError("invalid interval: %s" % (args,))
@@ -553,5 +576,6 @@ class RecurringTimeInterval(TimeInterval):
     def __init__(self, n, *args):
         if n is not None and n < 0:
             raise ValueError("invalid number of recurrences %d" % n)
-        self.n = n
         super(RecurringTimeInterval, self).__init__(*args)
+        self.n = n
+        self.elements = [self.n] + self.elements
