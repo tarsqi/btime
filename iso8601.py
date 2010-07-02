@@ -2,6 +2,7 @@
 
 from functools import wraps
 from itertools import chain, repeat, izip as zip
+from operator import eq
 import re
 
 from slotmerger import SlotMerger
@@ -252,6 +253,9 @@ class TimeRep(object):
                     yield x
             else:
                 yield (elt, cls)
+
+    def __eq__(self, other):
+        return all(map(eq, self, other))
 
 class TimePoint(TimeRep):
     pass
