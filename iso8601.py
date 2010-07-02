@@ -586,7 +586,10 @@ class Format(object):
     def format(self, timerep):
         self.separators = []
         self.stack = []
-        self.input = iter(timerep)
+        if isinstance(timerep, TimeRep):
+            self.input = iter(timerep)
+        elif isinstance(timerep, TimeUnit):
+            self.input = iter([(timerep, type(timerep))])
         ops = iter(self.ops); op = ops.next()
         while True:
             # Fops can decline to format an element; this is used to elide
