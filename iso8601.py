@@ -311,7 +311,7 @@ class Time(TimePoint):
     designators = {"T": None, "Z": UTCDesignator}
     separators = [":"]
 
-    @units(Hour, Minute, Second, UTCOffset)
+    @units(Hour, Minute, Second)
     def __init__(self, hour=None, minute=None, second=None, offset=None):
         self.check_accuracy(hour, minute, second)
         super(Time, self).__init__((hour, minute, second, offset),
