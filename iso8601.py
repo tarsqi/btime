@@ -526,6 +526,8 @@ class Time(TimePoint):
             return Time(self.hour, self.minute, other, self.utcoffset)
         elif isinstance(other, UTCOffset):
             return Time(self.hour, self.minute, self.second, other)
+        elif isinstance(other, Hour) and other.signed:
+            return Time(self.hour, self.minute, self.second, UTCOffset(other))
 
 class DateTime(Date, Time):
     designators = {"T": Time}
