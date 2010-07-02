@@ -325,7 +325,7 @@ class TimeUnit(object):
 class Year(TimeUnit):
     range = (0, 9999)
 
-    def merge(self, other):
+    def merge(self, other, destructive=False):
         if isinstance(other, Month):
             return CalendarDate(self, other)
         elif isinstance(other, Week):
@@ -354,7 +354,7 @@ class DayOfWeek(Day):
 class Hour(TimeUnit):
     range = (0, 24)
 
-    def merge(self, other):
+    def merge(self, other, destructive=False):
         if isinstance(other, Minute):
             if self.signed:
                 return UTCOffset(self, other)
@@ -372,7 +372,7 @@ class Cardinal(TimeUnit):
         super(Cardinal, self).__init__(value, False)
 
 class Years(Cardinal, Year):
-    def merge(self, other):
+    def merge(self, other, destructive=False):
         if isinstance(other, Months):
             return Duration(self, other)
 
@@ -386,7 +386,7 @@ class Days(Cardinal, Day):
     pass
 
 class Hours(Cardinal, Hour):
-    def merge(self, other):
+    def merge(self, other, destructive=False):
         if isinstance(other, Minutes):
             return TimeDuration(self, other)
 
@@ -493,8 +493,6 @@ class Date(TimePoint):
     def merge(self, other, destructive=False):
         if isinstance(other, Time):
             return DateTime(self, other)
-        elif isinstance(other, Hour):
-            return DateTime(self, Time(other))
         else:
             return super(Date, self).merge(other, destructive)
 
