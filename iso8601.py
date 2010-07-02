@@ -6,234 +6,6 @@ import re
 
 from slotmerger import SlotMerger
 
-class StopFormat(Exception):
-    pass
-
-class FormatOp(object):
-    def format(self, m):
-        """Format the next element in the input and push the result onto the
-        stack. Returns False if the element can not be formatted."""
-        return False
-
-    def read(self, m):
-        """Read zero or more characters from the input, and possibly push a
-        new element onto the stack. Returns True if the top elements of the
-        stack should be merged, or False otherwise."""
-        raise StopFormat
-
-class Literal(FormatOp):
-    def __init__(self, lit):
-        self.lit = lit.upper()
-
-    def format(self, m):
-        m.stack.append(self.lit)
-        return True
-
-    def read(self, m):
-        if not self.lit or m.input.startswith(self.lit, m.i):
-            m.i += len(self.lit)
-            return False
-        else:
-            raise StopFormat("expected [%s]; got [%s]" % \
-                                 (self.lit, m.input[m.i:m.i+len(self.lit)]))
-
-    def __eq__(self, other):
-        return ((isinstance(other, basestring) and self.lit == other.upper()) or
-                (isinstance(other, self.__class__) and self.lit == other.lit))
-
-    def __repr__(self):
-        return "%s(%r)" % (self.__class__.__name__, self.lit)
-
-class Separator(Literal):
-    def format(self, m):
-        m.separators.append(self.lit)
-        return True
-
-class Designator(Literal):
-    def __init__(self, lit, cls):
-        super(Designator, self).__init__(lit)
-        self.cls = cls
-
-    def read(self, m):
-        super(Designator, self).read(m)
-        m.stack.append(self.cls())
-        return False
-
-class Coerce(Designator):
-    def read(self, m):
-        """Coerce the element on the top of the stack to a different type."""
-        Literal.read(self, m)
-        m.stack[-1] = self.cls(m.stack[-1])
-        return True
-
-class UTCDesignator(Designator):
-    def __init__(self):
-        super(UTCDesignator, self).__init__("Z", UTCOffset)
-
-    def read(self, m):
-        super(Designator, self).read(m)
-        m.stack.append(UTC)
-        return True
-
-Z = UTCDesignator()
-
-class Element(FormatOp):
-    def __init__(self, cls, min=0, max=None, signed=False):
-        assert issubclass(cls, TimeUnit)
-        self.cls = cls
-        self.min = min
-        self.max = max
-        self.signed = signed
-        self.pattern = re.compile("(%s[0-9]{%d,%s})" % \
-                                      ("[+-]" if signed else "",
-                                       self.min, self.max or ""))
-
-    def format(self, m):
-        elt, cls = m.input.next()
-        if elt and issubclass(cls, self.cls):
-            value = int(elt)
-            m.stack.append((m.separators.pop() if m.separators else "") +
-                           (("-" if value<0 else "+") if self.signed else "") +
-                           ("%0*d" % (self.min, abs(value)))[0:self.max])
-            return True
-
-    def read(self, m):
-        match = self.pattern.match(m.input[m.i:])
-        if match:
-            digits = match.group(0)
-            m.stack.append(self.cls(int(digits), signed=self.signed))
-            m.i += len(digits)
-            m.merge = True
-            return True
-        else:
-            raise StopFormat("expected digit; got [%s]" % m.input[m.i])
-
-    def __eq__(self, other):
-        return (isinstance(other, self.__class__) and
-                self.cls is other.cls and
-                self.min == other.min and
-                self.max == other.max)
-
-    def __repr__(self):
-        return "%s(%s, %s, %s, %s)" % (self.__class__.__name__,
-                                       self.cls.__name__,
-                                       self.min, self.max, self.signed)
-
-class FormatReprParser(object):
-    def __init__(self, format_repr):
-        self.repr = re.sub(r"_(.)", ur"\1̲", format_repr) # convert _X to X̲
-
-    def __iter__(self):
-        self.i = -1
-        return self
-
-    def next(self):
-        self.i += 1
-        try:
-            return self.repr[self.i]
-        except IndexError:
-            raise StopIteration
-
-    def peek(self):
-        try:
-            return self.repr[self.i+1]
-        except IndexError:
-            pass
-
-    def designator(self, char):
-        if char in self.syntax.designators:
-            designate = self.syntax.designators[char]
-            if designate and issubclass(designate, TimeUnit):
-                # Postfix designator: coerce the last element.
-                return Coerce(char, designate)
-            elif designate is UTCDesignator:
-                return Z
-            else:
-                if designate:
-                    self.stack.append(designate) # push new syntax class
-                return Designator(char, designate)
-
-    def separator(self, char):
-        for level, cls in enumerate(reversed(self.stack)):
-            if char in cls.separators:
-                for i in range(level):
-                    self.stack.pop()
-                return Separator(char)
-
-    def element(self, char):
-        """Consume as many of the same digit-representing characters as
-        possible from the format representation and return an Element fop."""
-        signed = False
-        if char == u"±":
-            signed = True
-            char = self.next()
-        repeat = False
-        n = 1
-        while self.peek() == char:
-            n += 1
-            self.next()
-        if self.peek() == u"\u0332": # combining low line (underline)
-            repeat = True
-            n -= 1 # last char was underlined; don't count it
-            self.next() # discard underline
-        return Element(self.syntax.digits[char],
-                       n, None if repeat else n, signed)
-
-    @property
-    def syntax(self):
-        return self.stack[-1]
-
-    def parse(self):
-        # We'll start in the most general syntax and let the designators
-        # sort it out.
-        self.stack = [RecurringTimeInterval]
-        for char in self:
-            yield (self.designator(char) or
-                   self.separator(char) or
-                   self.element(char))
-
-class Format(object):
-    def __init__(self, format_repr):
-        self.ops = list(FormatReprParser(format_repr).parse())
-
-    def format(self, timerep):
-        self.separators = []
-        self.stack = []
-        self.input = iter(timerep)
-        ops = iter(self.ops); op = ops.next()
-        while True:
-            # Fops can decline to format an element; this is used to elide
-            # lower-order components.
-            if op.format(self):
-                try:
-                    op = ops.next()
-                except StopIteration:
-                    break
-        return "".join(self.stack)
-
-    def read(self, string):
-        self.input = string.upper()
-        self.i = 0
-        self.stack = []
-        ops = iter(self.ops)
-        n = len(self.input)
-        while self.i < n:
-            if ops.next().read(self) and len(self.stack) > 1:
-                # Merge top two elements.
-                merged = self.stack[-2].merge(self.stack[-1])
-                if merged:
-                    self.stack[-2:] = [merged]
-
-        # Now we merge bottom-up.
-        while len(self.stack) > 1:
-            merged = self.stack[0].merge(self.stack[1])
-            if merged:
-                self.stack[0:2] = [merged]
-            else:
-                raise StopFormat("can't merge elements: %s" % self.stack[0:2])
-
-        return self.stack[0]
-
 class InvalidTimeUnit(Exception):
     def __init__(self, unit, value):
         self.unit = unit
@@ -614,3 +386,231 @@ class RecurringTimeInterval(TimeInterval):
         self.n = n
         # Ack! Kludge! Yuck!
         self.elements = [(self.n, int)] + self.elements
+
+class StopFormat(Exception):
+    pass
+
+class FormatOp(object):
+    def format(self, m):
+        """Format the next element in the input and push the result onto the
+        stack. Returns False if the element can not be formatted."""
+        return False
+
+    def read(self, m):
+        """Read zero or more characters from the input, and possibly push a
+        new element onto the stack. Returns True if the top elements of the
+        stack should be merged, or False otherwise."""
+        raise StopFormat
+
+class Literal(FormatOp):
+    def __init__(self, lit):
+        self.lit = lit.upper()
+
+    def format(self, m):
+        m.stack.append(self.lit)
+        return True
+
+    def read(self, m):
+        if not self.lit or m.input.startswith(self.lit, m.i):
+            m.i += len(self.lit)
+            return False
+        else:
+            raise StopFormat("expected [%s]; got [%s]" % \
+                                 (self.lit, m.input[m.i:m.i+len(self.lit)]))
+
+    def __eq__(self, other):
+        return ((isinstance(other, basestring) and self.lit == other.upper()) or
+                (isinstance(other, self.__class__) and self.lit == other.lit))
+
+    def __repr__(self):
+        return "%s(%r)" % (self.__class__.__name__, self.lit)
+
+class Separator(Literal):
+    def format(self, m):
+        m.separators.append(self.lit)
+        return True
+
+class Designator(Literal):
+    def __init__(self, lit, cls):
+        super(Designator, self).__init__(lit)
+        self.cls = cls
+
+    def read(self, m):
+        super(Designator, self).read(m)
+        m.stack.append(self.cls())
+        return False
+
+class Coerce(Designator):
+    def read(self, m):
+        """Coerce the element on the top of the stack to a different type."""
+        Literal.read(self, m)
+        m.stack[-1] = self.cls(m.stack[-1])
+        return True
+
+class UTCDesignator(Designator):
+    def __init__(self):
+        super(UTCDesignator, self).__init__("Z", UTCOffset)
+
+    def read(self, m):
+        super(Designator, self).read(m)
+        m.stack.append(UTC)
+        return True
+
+Z = UTCDesignator()
+
+class Element(FormatOp):
+    def __init__(self, cls, min=0, max=None, signed=False):
+        assert issubclass(cls, TimeUnit)
+        self.cls = cls
+        self.min = min
+        self.max = max
+        self.signed = signed
+        self.pattern = re.compile("(%s[0-9]{%d,%s})" % \
+                                      ("[+-]" if signed else "",
+                                       self.min, self.max or ""))
+
+    def format(self, m):
+        elt, cls = m.input.next()
+        if elt and issubclass(cls, self.cls):
+            value = int(elt)
+            m.stack.append((m.separators.pop() if m.separators else "") +
+                           (("-" if value<0 else "+") if self.signed else "") +
+                           ("%0*d" % (self.min, abs(value)))[0:self.max])
+            return True
+
+    def read(self, m):
+        match = self.pattern.match(m.input[m.i:])
+        if match:
+            digits = match.group(0)
+            m.stack.append(self.cls(int(digits), signed=self.signed))
+            m.i += len(digits)
+            m.merge = True
+            return True
+        else:
+            raise StopFormat("expected digit; got [%s]" % m.input[m.i])
+
+    def __eq__(self, other):
+        return (isinstance(other, self.__class__) and
+                self.cls is other.cls and
+                self.min == other.min and
+                self.max == other.max)
+
+    def __repr__(self):
+        return "%s(%s, %s, %s, %s)" % (self.__class__.__name__,
+                                       self.cls.__name__,
+                                       self.min, self.max, self.signed)
+
+class FormatReprParser(object):
+    def __init__(self, format_repr):
+        self.repr = re.sub(r"_(.)", ur"\1̲", format_repr) # convert _X to X̲
+
+    def __iter__(self):
+        self.i = -1
+        return self
+
+    def next(self):
+        self.i += 1
+        try:
+            return self.repr[self.i]
+        except IndexError:
+            raise StopIteration
+
+    def peek(self):
+        try:
+            return self.repr[self.i+1]
+        except IndexError:
+            pass
+
+    def designator(self, char):
+        if char in self.syntax.designators:
+            designate = self.syntax.designators[char]
+            if designate and issubclass(designate, TimeUnit):
+                # Postfix designator: coerce the last element.
+                return Coerce(char, designate)
+            elif designate is UTCDesignator:
+                return Z
+            else:
+                if designate:
+                    self.stack.append(designate) # push new syntax class
+                return Designator(char, designate)
+
+    def separator(self, char):
+        for level, cls in enumerate(reversed(self.stack)):
+            if char in cls.separators:
+                for i in range(level):
+                    self.stack.pop()
+                return Separator(char)
+
+    def element(self, char):
+        """Consume as many of the same digit-representing characters as
+        possible from the format representation and return an Element fop."""
+        signed = False
+        if char == u"±":
+            signed = True
+            char = self.next()
+        repeat = False
+        n = 1
+        while self.peek() == char:
+            n += 1
+            self.next()
+        if self.peek() == u"\u0332": # combining low line (underline)
+            repeat = True
+            n -= 1 # last char was underlined; don't count it
+            self.next() # discard underline
+        return Element(self.syntax.digits[char],
+                       n, None if repeat else n, signed)
+
+    @property
+    def syntax(self):
+        return self.stack[-1]
+
+    def parse(self):
+        # We'll start in the most general syntax and let the designators
+        # sort it out.
+        self.stack = [RecurringTimeInterval]
+        for char in self:
+            yield (self.designator(char) or
+                   self.separator(char) or
+                   self.element(char))
+
+class Format(object):
+    def __init__(self, format_repr):
+        self.ops = list(FormatReprParser(format_repr).parse())
+
+    def format(self, timerep):
+        self.separators = []
+        self.stack = []
+        self.input = iter(timerep)
+        ops = iter(self.ops); op = ops.next()
+        while True:
+            # Fops can decline to format an element; this is used to elide
+            # lower-order components.
+            if op.format(self):
+                try:
+                    op = ops.next()
+                except StopIteration:
+                    break
+        return "".join(self.stack)
+
+    def read(self, string):
+        self.input = string.upper()
+        self.i = 0
+        self.stack = []
+        ops = iter(self.ops)
+        n = len(self.input)
+        while self.i < n:
+            if ops.next().read(self) and len(self.stack) > 1:
+                # Merge top two elements.
+                merged = self.stack[-2].merge(self.stack[-1])
+                if merged:
+                    self.stack[-2:] = [merged]
+
+        # Now we merge bottom-up.
+        while len(self.stack) > 1:
+            merged = self.stack[0].merge(self.stack[1])
+            if merged:
+                self.stack[0:2] = [merged]
+            else:
+                raise StopFormat("can't merge elements: %s" % self.stack[0:2])
+
+        return self.stack[0]
