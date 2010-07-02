@@ -501,7 +501,8 @@ class Element(FormatOp):
                                        self.min, self.max, self.signed)
 
 class FormatReprParser(object):
-    def __init__(self, format_repr):
+    def __init__(self, syntax, format_repr):
+        self.initial_syntax = syntax
         self.repr = re.sub(r"_(.)", ur"\1̲", format_repr) # convert _X to X̲
 
     def __iter__(self):
@@ -565,17 +566,15 @@ class FormatReprParser(object):
         return self.stack[-1]
 
     def parse(self):
-        # We'll start in the most general syntax and let the designators
-        # sort it out.
-        self.stack = [RecurringTimeInterval]
+        self.stack = [self.initial_syntax]
         for char in self:
             yield (self.designator(char) or
                    self.separator(char) or
                    self.element(char))
 
 class Format(object):
-    def __init__(self, format_repr):
-        self.ops = list(FormatReprParser(format_repr).parse())
+    def __init__(self, format_repr, syntax=RecurringTimeInterval):
+        self.ops = list(FormatReprParser(syntax, format_repr).parse())
 
     def format(self, timerep):
         self.separators = []
