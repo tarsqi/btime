@@ -42,21 +42,23 @@ class Separator(Literal):
         return True
 
 class Designator(Literal):
-    pass
-
-class Coerce(Designator):
     def __init__(self, lit, cls):
-        super(Coerce, self).__init__(lit)
+        super(Designator, self).__init__(lit)
         self.cls = cls
 
     def read(self, m):
+        if super(Designator, self).read(m):
+            m.stack.append(self.cls())
+
+class Coerce(Designator):
+    def read(self, m):
         """Coerce the element on the top of the stack to a different type."""
-        if super(Coerce, self).read(m):
+        if Literal.read(self, m):
             m.stack[-1] = self.cls(m.stack[-1])
 
 class UTCDesignator(Designator):
     def __init__(self):
-        super(UTCDesignator, self).__init__("Z")
+        super(UTCDesignator, self).__init__("Z", UTCOffset)
 
     def read(self, m):
         if super(Designator, self).read(m):
@@ -136,7 +138,7 @@ class FormatReprParser(object):
             else:
                 if designate:
                     self.stack.append(designate) # push new syntax class
-                return Designator(char)
+                return Designator(char, designate)
 
     def separator(self, char):
         for level, cls in enumerate(reversed(self.stack)):
@@ -420,6 +422,25 @@ class TimeRep(object):
                 lse = i
         self.reduced_accuracy = lse < len(elements) - 1
 
+    def copy(self):
+        return self.__class__(*(map(lambda x: x[0], self.elements)))
+
+    def merge(self, other, destructive=False):
+        if isinstance(other, self.__class__):
+            merged = self if destructive else self.copy()
+            for i, (elt, cls) in enumerate(merged.elements):
+                merged.elements[i] = merged.elements[i] if elt \
+                                                        else other.elements[i]
+            return merged
+        for i, (elt, cls) in enumerate(self.elements):
+            if isinstance(other, cls):
+                merged = self if destructive else self.copy()
+                merged.elements[i] = (other, cls)
+                return merged
+
+    def nmerge(self, other):
+        return self.merge(other, True)
+
     def __getattr__(self, name):
         for elt, cls in self.elements:
             if any(c.__name__.lower() == name for c in cls.__mro__):
@@ -449,11 +470,13 @@ class Date(TimePoint):
     separators = [u"-", # hyphen-minus (a.k.a. ASCII hyphen, U+002D)
                   u"‐"] # hyphen (U+2010)
 
-    def merge(self, other):
+    def merge(self, other, destructive=False):
         if isinstance(other, Time):
             return DateTime(self, other)
         elif isinstance(other, Hour):
             return DateTime(self, Time(other))
+        else:
+            return super(Date, self).merge(other, destructive)
 
 class CalendarDate(Date):
     digits = {"Y": Year, "M": Month, "D": DayOfMonth}
@@ -461,15 +484,7 @@ class CalendarDate(Date):
     @units(Year, Month, DayOfMonth)
     def __init__(self, *args):
         self.check_accuracy(*args)
-        super(CalendarDate, self).__init__(args, (Year, Month, DayOfMonth))
-
-    def merge(self, other):
-        if isinstance(other, Month):
-            return CalendarDate(self.year, other)
-        elif isinstance(other, Day):
-            return CalendarDate(self.year, self.month, other)
-        else:
-            return super(CalendarDate, self).merge(other)
+        super(CalendarDate, self).__init__(args, (Year, Month, Day))
 
 class OrdinalDate(Date):
     digits = {"Y": Year, "D": DayOfYear}
@@ -477,13 +492,7 @@ class OrdinalDate(Date):
     @units(Year, DayOfYear)
     def __init__(self, *args):
         self.check_accuracy(*args)
-        super(OrdinalDate, self).__init__(args, (Year, DayOfYear))
-
-    def merge(self, other):
-        if isinstance(other, Day):
-            return OrdinalDate(self.year, other)
-        else:
-            return super(OrdinalDate, self).merge(other)
+        super(OrdinalDate, self).__init__(args, (Year, Day))
 
 class WeekDate(Date):
     digits = {"Y": Year, "w": Week, "D": DayOfWeek}
@@ -492,14 +501,6 @@ class WeekDate(Date):
     def __init__(self, *args):
         self.check_accuracy(*args)
         super(WeekDate, self).__init__(args, (Year, Week, Day))
-
-    def merge(self, other):
-        if isinstance(other, Week):
-            return WeekDate(self.year, other)
-        elif isinstance(other, Day):
-            return WeekDate(self.year, self.week, other)
-        else:
-            return super(WeekDate, self).merge(other)
 
 class UTCOffset(TimePoint):
     digits = {"h": Hour, "m": Minute}
@@ -522,15 +523,11 @@ class Time(TimePoint):
         super(Time, self).__init__((hour, minute, second, offset),
                                    (Hour, Minute, Second, UTCOffset))
 
-    def merge(self, other):
-        if isinstance(other, Minute):
-            return Time(self.hour, other, self.second, self.utcoffset)
-        elif isinstance(other, Second):
-            return Time(self.hour, self.minute, other, self.utcoffset)
-        elif isinstance(other, UTCOffset):
-            return Time(self.hour, self.minute, self.second, other)
-        elif isinstance(other, Hour) and other.signed:
+    def merge(self, other, destructive=False):
+        if isinstance(other, Hour) and other.signed:
             return Time(self.hour, self.minute, self.second, UTCOffset(other))
+        else:
+            return super(Time, self).merge(other, destructive)
 
 class DateTime(Date, Time):
     designators = {"T": Time}
@@ -540,11 +537,13 @@ class DateTime(Date, Time):
         self.check_accuracy(date, time)
         TimeRep.__init__(self, (date, time), (Date, Time))
 
-    def merge(self, other):
+    def merge(self, other, destructive=False):
         if isinstance(other, (Hour, Minute, Second)):
             return DateTime(self.date, self.time.merge(other))
         elif isinstance(other, DateTime):
             return TimeInterval(self, other)
+        else:
+            return super(DateTime, self).merge(other, destructive)
 
 class TimeDuration(TimeRep):
     digits = {"n": TimeUnit}
@@ -561,7 +560,7 @@ class Duration(TimeRep):
     designators = {"W": Weeks, "Y": Years, "M": Months, "D": Days,
                    "T": TimeDuration}
 
-    @units(Years, Months, Days, Weeks, TimeDuration)
+    @units(Years, Months, Days)
     def __init__(self, years=0, months=0, days=0, weeks=None, time=None):
         if weeks is not None:
             super(Duration, self).__init__((weeks,), (Weeks,))
@@ -570,15 +569,11 @@ class Duration(TimeRep):
             super(Duration, self).__init__((years, months, days, time),
                                            (Years, Months, Days, TimeDuration))
 
-    def merge(self, other):
-        if isinstance(other, Months):
-            return Duration(self.years, other)
-        elif isinstance(other, Days):
-            return Duration(self.years, self.months, other)
-        elif isinstance(other, TimeDuration):
-            return Duration(self.years, self.months, self.days, other)
-        elif isinstance(other, Weeks):
-            return Duration(other)
+    def merge(self, other, destructive=False):
+        if isinstance(other, Weeks):
+            return Duration(weeks=other)
+        else:
+            return super(Duration, self).merge(other, destructive)
 
 class TimeInterval(DateTime):
     designators = {"P": Duration}
