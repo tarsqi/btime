@@ -4,14 +4,16 @@ from unittest import *
 
 from iso8601 import *
 
-class TestParseRepr(TestCase):
+class TestFormatReprParser(TestCase):
     class X(TimePoint):
         """Dummy time element."""
         digits = {"X": TimeUnit}
+        designators = {"T": Time}
         separators = ["-"]
 
     def assertFormatRepr(self, format_repr, op):
-        self.assertEqual(parse_format_repr(self.X, format_repr).next(), op)
+        parser = FormatReprParser(self.X, format_repr)
+        self.assertEqual(parser.parse().next(), op)
 
     def test_element(self):
         """Time elements with min/max digits in format representation"""
@@ -32,9 +34,13 @@ class TestParseRepr(TestCase):
         """Separator in format representation"""
         self.assertFormatRepr("-", Separator("-"))
 
+    def test_designator(self):
+        """Designator in format representation"""
+        self.assertFormatRepr("T", Designator("T", Time))
+
 def suite():
     return TestSuite([TestLoader().loadTestsFromTestCase(cls) \
-                          for cls in (TestParseRepr,)])
+                          for cls in (TestFormatReprParser,)])
 
 def run(runner=TextTestRunner, **args):
     return runner(**args).run(suite())
