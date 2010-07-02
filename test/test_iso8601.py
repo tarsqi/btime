@@ -39,8 +39,8 @@ class TestFormatReprParser(TestCase):
         self.assertFormatRepr("T", Designator("T", Time))
 
 class RepresentationTestCase(TestCase):
-    def assertFormat(self, format_repr, representation, obj):
-        format = Format(format_repr)
+    def assertFormat(self, format_repr, representation, obj, syntax=None):
+        format = Format(format_repr, syntax) if syntax else Format(format_repr)
         self.assertEqual(format.read(representation), obj)
         self.assertEqual(format.format(obj), representation)
 
@@ -65,12 +65,15 @@ class TestCalendarDate(RepresentationTestCase):
         date = CalendarDate(1985, 4, 12)
         self.assertFormat(u"±YYYYYYMMDD", "+0019850412", date) # basic format
         self.assertFormat(u"±YYYYYY-MM-DD", "+001985-04-12", date) # extended
+
         # b) A specific month
         month = CalendarDate(1985, 4)
         self.assertFormat(u"±YYYYYYMM", "+00198504", month) # basic format
         self.assertFormat(u"±YYYYYY-MM", "+001985-04", month) # extended format
+
         # c) A specific year
         self.assertFormat(u"±YYYYYY", "+001985", Year(1985))
+
         # d) A specific century
         self.assertFormat(u"±YYYY", "+0019", Year(19)) # not actually a century
 
@@ -111,21 +114,111 @@ class TestWeekDate(RepresentationTestCase):
         date = CalendarDate(1985, 4, 12)
         self.assertFormat(u"±YYYYYYMMDD", "+0019850412", date) # basic format
         self.assertFormat(u"±YYYYYY-MM-DD", "+001985-04-12", date) # extended
+
         # b) A specific month
         month = CalendarDate(1985, 4)
         self.assertFormat(u"±YYYYYYMM", "+00198504", month) # basic format
         self.assertFormat(u"±YYYYYY-MM", "+001985-04", month) # extended format
+
         # c) A specific year
         self.assertFormat(u"±YYYYYY", "+001985", Year(1985))
+
         # d) A specific century
         self.assertFormat(u"±YYYY", "+0019", Year(19)) # not actually a century
+
+class TestLocalTime(RepresentationTestCase):
+    """Section 4.2.2."""
+
+    def test_complete(self):
+        """4.2.2.2"""
+        time = Time(23, 20, 50)
+        self.assertFormat("hhmmss", "232050", time, Time) # basic format
+        self.assertFormat("hh:mm:ss", "23:20:50", time, Time) # basic format
+
+    def test_reduced(self):
+        """4.2.2.3"""
+        # a) A specific hour and minute
+        time = Time(23, 20)
+        self.assertFormat("hhmm", "2320", time, Time) # basic format
+        self.assertFormat("hh:mm", "23:20", time, Time) # basic format
+
+        # b) A specific hour
+        self.assertFormat("hh", "23", Hour(23), Time)
+
+    def test_decimal_fraction(self):
+        """4.2.2.4"""
+        # a) A specific hour, minute, and second and a decimal fraction of
+        # the second
+        time = Time(23, 20, 50.5)
+        self.assertFormat(u"hhmmss,ss̲", "232050,5", time, Time) # basic format
+        self.assertFormat(u"hh:mm:ss,ss̲", "23:20:50,5", time, Time) # extended
+
+        # b) A specific hour and minute and a decimal fraction of the minute
+        time = Time(23, 20.8)
+        self.assertFormat(u"hhmm,mm̲", "2320,8", time, Time) # basic format
+        self.assertFormat(u"hh:mm,mm̲", "23:20,8", time, Time) # extended format
+
+        # c) A specific hour and a decimal fraction of the hour
+        self.assertFormat(u"hh,hh̲", "23,3", Time(23.3), Time)
+
+    def test_with_designator(self):
+        """4.2.2.5"""
+        time = Time(23, 20, 50)
+        self.assertFormat("Thhmmss", "T232050", time)
+
+class TestUTC(RepresentationTestCase):
+    def test(self):
+        """4.2.4"""
+        # Basic format
+        self.assertFormat("hhmmssZ", "232030Z", Time(23, 20, 30, offset=UTC), Time)
+        self.assertFormat("hhmmZ", "2320Z", Time(23, 20, offset=UTC), Time)
+        self.assertFormat("hhZ", "23Z", Time(23, offset=UTC), Time)
+
+        # Extended format
+        self.assertFormat("hh:mm:ssZ", "23:20:30Z", Time(23, 20, 30, offset=UTC), Time)
+        self.assertFormat("hh:mmZ", "23:20Z", Time(23, 20, offset=UTC), Time)
+
+class TestLocalTimeAndUTC(RepresentationTestCase):
+    def test_difference(self):
+        """4.2.5.1"""
+        # Basic format
+        self.assertFormat(u"±hhmm", "+0100", UTCOffset(1, 0))
+        self.assertFormat(u"±hh", "+01", Hour(1, signed=True))
+
+        # Extended format
+        self.assertFormat(u"±hh:mm", "+01:00", UTCOffset(1, 0))
+
+    def test_local_time_and_difference(self):
+        """4.2.5.2"""
+        # Basic format
+        self.assertFormat(u"hhmmss±hhmm", "152746+0100",
+                          Time(15, 27, 46, UTCOffset(1, 0)))
+        self.assertFormat(u"hhmmss±hhmm", "152746-0500",
+                          Time(15, 27, 46, UTCOffset(-5, 0)))
+        self.assertFormat(u"hhmmss±hh", "152746+01",
+                          Time(15, 27, 46, UTCOffset(1)))
+        self.assertFormat(u"hhmmss±hh", "152746-05",
+                          Time(15, 27, 46, UTCOffset(-5)))
+
+        # Extended format
+        self.assertFormat(u"hh:mm:ss±hh:mm", "15:27:46+01:00",
+                          Time(15, 27, 46, UTCOffset(1, 0)))
+        self.assertFormat(u"hh:mm:ss±hh:mm", "15:27:46-05:00",
+                          Time(15, 27, 46, UTCOffset(-5, 0)))
+        self.assertFormat(u"hh:mm:ss±hh", "15:27:46+01",
+                          Time(15, 27, 46, UTCOffset(1)))
+        self.assertFormat(u"hh:mm:ss±hh", "15:27:46-05",
+                          Time(15, 27, 46, UTCOffset(-5)))
 
 def suite():
     return TestSuite([TestLoader().loadTestsFromTestCase(cls) \
                           for cls in (TestFormatReprParser,
                                       TestCalendarDate,
                                       TestOrdinalDate,
-                                      TestWeekDate,)])
+                                      TestWeekDate,
+                                      TestLocalTime,
+                                      TestUTC,
+                                      TestLocalTimeAndUTC,)])
 
 def run(runner=TextTestRunner, **args):
     return runner(**args).run(suite())
