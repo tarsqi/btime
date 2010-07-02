@@ -440,6 +440,9 @@ class Designator(Literal):
         m.stack.append(self.cls())
         return False
 
+    def __eq__(self, other):
+        return super(Designator, self).__eq__(other) and self.cls is other.cls
+
 class Coerce(Designator):
     def read(self, m):
         """Coerce the element on the top of the stack to a different type."""
