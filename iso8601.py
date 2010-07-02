@@ -439,6 +439,10 @@ class Designator(Literal):
         super(Designator, self).__init__(lit)
         self.cls = cls
 
+    def format(self, m):
+        m.stack.append(m.separators.pop() if m.separators else "")
+        return super(Designator, self).format(m)
+
     def read(self, m):
         super(Designator, self).read(m)
         if self.cls:
