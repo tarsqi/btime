@@ -38,9 +38,94 @@ class TestFormatReprParser(TestCase):
         """Designator in format representation"""
         self.assertFormatRepr("T", Designator("T", Time))
 
+class RepresentationTestCase(TestCase):
+    def assertFormat(self, format_repr, representation, obj):
+        format = Format(format_repr)
+        self.assertEqual(format.read(representation), obj)
+        self.assertEqual(format.format(obj), representation)
+
+class TestCalendarDate(RepresentationTestCase):
+    """Section 4.1.2."""
+
+    def test_complete(self):
+        """4.1.2.2"""
+        date = CalendarDate(1985, 4, 12)
+        self.assertFormat("YYYYMMDD", "19850412", date) # basic format
+        self.assertFormat("YYYY-MM-DD", "1985-04-12", date) # extended format
+
+    def test_reduced(self):
+        """4.1.2.3"""
+        self.assertFormat("YYYY-MM", "1985-04", CalendarDate(1985, 4))
+        self.assertFormat("YYYY", "1985", Year(1985))
+        self.assertFormat("YY", "19", Year(19)) # not actually a century
+
+    def test_expanded(self):
+        """4.1.2.4"""
+        # a) A specific day
+        date = CalendarDate(1985, 4, 12)
+        self.assertFormat(u"±YYYYYYMMDD", "+0019850412", date) # basic format
+        self.assertFormat(u"±YYYYYY-MM-DD", "+001985-04-12", date) # extended
+        # b) A specific month
+        month = CalendarDate(1985, 4)
+        self.assertFormat(u"±YYYYYYMM", "+00198504", month) # basic format
+        self.assertFormat(u"±YYYYYY-MM", "+001985-04", month) # extended format
+        # c) A specific year
+        self.assertFormat(u"±YYYYYY", "+001985", Year(1985))
+        # d) A specific century
+        self.assertFormat(u"±YYYY", "+0019", Year(19)) # not actually a century
+
+class TestOrdinalDate(RepresentationTestCase):
+    """Section 4.1.3."""
+
+    def test_complete(self):
+        """4.1.3.2"""
+        date = OrdinalDate(1985, 102)
+        self.assertFormat("YYYYDDD", "1985102", date) # basic format
+        self.assertFormat("YYYY-DDD", "1985-102", date) # extended format
+
+    def test_expanded(self):
+        """4.1.3.3"""
+        date = OrdinalDate(1985, 102)
+        self.assertFormat(u"±YYYYYYDDD", "+001985102", date) # basic format
+        self.assertFormat(u"±YYYYYY-DDD", "+001985-102", date) # extended format
+
+class TestWeekDate(RepresentationTestCase):
+    """Section 4.1.4."""
+
+    def test_complete(self):
+        """4.1.4.2"""
+        date = WeekDate(1985, 15, 5)
+        self.assertFormat("YYYYWwwD", "1985W155", date) # basic format
+        self.assertFormat("YYYY-Www-D", "1985-W15-5", date) # extended format
+
+    def test_reduced(self):
+        """4.1.4.3"""
+        # A specific week
+        week = WeekDate(1985, 15)
+        self.assertFormat("YYYYWww", "1985W15", week) # basic format
+        self.assertFormat("YYYY-Www", "1985-W15", week) # extended format
+
+    def test_expanded(self):
+        """4.1.4.4"""
+        # a) A specific day
+        date = CalendarDate(1985, 4, 12)
+        self.assertFormat(u"±YYYYYYMMDD", "+0019850412", date) # basic format
+        self.assertFormat(u"±YYYYYY-MM-DD", "+001985-04-12", date) # extended
+        # b) A specific month
+        month = CalendarDate(1985, 4)
+        self.assertFormat(u"±YYYYYYMM", "+00198504", month) # basic format
+        self.assertFormat(u"±YYYYYY-MM", "+001985-04", month) # extended format
+        # c) A specific year
+        self.assertFormat(u"±YYYYYY", "+001985", Year(1985))
+        # d) A specific century
+        self.assertFormat(u"±YYYY", "+0019", Year(19)) # not actually a century
+
 def suite():
     return TestSuite([TestLoader().loadTestsFromTestCase(cls) \
-                          for cls in (TestFormatReprParser,)])
+                          for cls in (TestFormatReprParser,
+                                      TestCalendarDate,
+                                      TestOrdinalDate,
+                                      TestWeekDate,)])
 
 def run(runner=TextTestRunner, **args):
     return runner(**args).run(suite())
