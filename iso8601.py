@@ -441,7 +441,8 @@ class Designator(Literal):
 
     def read(self, m):
         super(Designator, self).read(m)
-        m.stack.append(self.cls())
+        if self.cls:
+            m.stack.append(self.cls())
         return False
 
     def __eq__(self, other):
