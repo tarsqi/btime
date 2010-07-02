@@ -45,6 +45,10 @@ class Designator(Literal):
     pass
 
 class Coerce(Designator):
+    def __init__(self, lit, cls):
+        super(Coerce, self).__init__(lit)
+        self.cls = cls
+
     def read(self, m):
         """Coerce the element on the top of the stack to a different type."""
         if super(Coerce, self).read(m):
@@ -404,6 +408,18 @@ class TimeRep(object):
     def __init__(self, elements, element_types):
         self.elements = list(zip(chain(elements, repeat(None)), element_types))
 
+    def check_accuracy(self, *elements):
+        """Given a list of elements in most-significant-first order, check
+        for legitimate omissions. Omission of an element is allowed only if
+        all of the more significant elements are supplied."""
+        lse = -1
+        for i, elt in reversed(tuple(enumerate(elements))):
+            if lse >= 0 and not elt:
+                raise ValueError("invalid date/time accuracy reduction")
+            elif elt and lse < 0:
+                lse = i
+        self.reduced_accuracy = lse < len(elements) - 1
+
     def __getattr__(self, name):
         for elt, cls in self.elements:
             if any(c.__name__.lower() == name for c in cls.__mro__):
@@ -425,20 +441,7 @@ class TimeRep(object):
                 yield (elt, cls)
 
 class TimePoint(TimeRep):
-    def __init__(self, *args):
-        super(TimePoint, self).__init__(*args)
-
-    def check_accuracy(self, *elements):
-        """Given a list of elements in most-significant-first order, check
-        for legitimate omissions. Omission of an element is allowed only if
-        all of the more significant elements are supplied."""
-        lse = -1
-        for i, elt in reversed(tuple(enumerate(elements))):
-            if lse >= 0 and not elt:
-                raise ValueError("invalid date/time accuracy reduction")
-            elif elt and lse < 0:
-                lse = i
-        self.reduced_accuracy = lse < len(elements) - 1
+    pass
 
 class Date(TimePoint):
     digits = {"Y": Year, "M": Month, "D": Day, "w": Week}
@@ -566,6 +569,17 @@ class Duration(TimeRep):
             self.check_accuracy(years, months, days, time)
             super(Duration, self).__init__((years, months, days, time),
                                            (Years, Months, Days, TimeDuration))
+
+    def merge(self, other):
+        if isinstance(other, Months):
+            return Duration(self.years, other)
+        elif isinstance(other, Days):
+            return Duration(self.years, self.months, other)
+        elif isinstance(other, TimeDuration):
+            return Duration(self.years, self.months, self.days, other)
+        elif isinstance(other, Weeks):
+            return Duration(other)
+
 class TimeInterval(DateTime):
     designators = {"P": Duration}
     separators = ["/"]
