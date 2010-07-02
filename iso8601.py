@@ -498,8 +498,7 @@ class Element(FormatOp):
             digits = match.group(0)
             m.stack.append(self.cls(int(digits), signed=self.signed))
             m.i += len(digits)
-            m.merge = True
-            return True
+            return not self.signed # don't merge signed elements
         else:
             raise StopFormat("expected digit; got [%s]" % m.input[m.i])
 
