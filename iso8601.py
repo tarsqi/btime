@@ -133,6 +133,8 @@ class Hour(TimeUnit):
                 return UTCOffset(self, other)
             else:
                 return Time(self, other)
+        elif isinstance(other, UTCOffset):
+            return Time(self, offset=other)
 
 class Minute(TimeUnit):
     range = (0, 59)
