@@ -308,7 +308,7 @@ UTC = UTCOffset(0)
 
 class Time(TimePoint):
     digits = {"h": Hour, "m": Minute, "s": Second}
-    designators = {"T": None, "Z": UTCDesignator}
+    designators = {"T": None, "Z": UTC}
     separators = [":"]
 
     @units(Hour, Minute, Second)
@@ -537,11 +537,12 @@ class FormatReprParser(object):
     def designator(self, char):
         if char in self.syntax.designators:
             designate = self.syntax.designators[char]
-            if designate and issubclass(designate, TimeUnit):
+            if designate is UTC:
+                # Special case: UTC designator.
+                return Z
+            elif designate and issubclass(designate, TimeUnit):
                 # Postfix designator: coerce the last element.
                 return Coerce(char, designate)
-            elif designate is UTCDesignator:
-                return Z
             else:
                 if designate:
                     self.stack.append(designate) # push new syntax class
