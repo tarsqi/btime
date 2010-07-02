@@ -11,10 +11,15 @@ class StopFormat(Exception):
 
 class FormatOp(object):
     def format(self, m):
+        """Format the next element in the input and push the result onto the
+        stack. Returns False if the element can not be formatted."""
         return False
 
     def read(self, m):
-        raise StopFormat(m)
+        """Read zero or more characters from the input, and possibly push a
+        new element onto the stack. Returns True if the top elements of the
+        stack should be merged, or False otherwise."""
+        raise StopFormat
 
 class Literal(FormatOp):
     def __init__(self, lit):
@@ -27,7 +32,10 @@ class Literal(FormatOp):
     def read(self, m):
         if not self.lit or m.input.startswith(self.lit, m.i):
             m.i += len(self.lit)
-            return True
+            return False
+        else:
+            raise StopFormat("expected [%s]; got [%s]" % \
+                                 (self.lit, m.input[m.i:m.i+len(self.lit)]))
 
     def __eq__(self, other):
         return ((isinstance(other, basestring) and self.lit == other.upper()) or
@@ -47,22 +55,25 @@ class Designator(Literal):
         self.cls = cls
 
     def read(self, m):
-        if super(Designator, self).read(m):
-            m.stack.append(self.cls())
+        super(Designator, self).read(m)
+        m.stack.append(self.cls())
+        return False
 
 class Coerce(Designator):
     def read(self, m):
         """Coerce the element on the top of the stack to a different type."""
-        if Literal.read(self, m):
-            m.stack[-1] = self.cls(m.stack[-1])
+        Literal.read(self, m)
+        m.stack[-1] = self.cls(m.stack[-1])
+        return True
 
 class UTCDesignator(Designator):
     def __init__(self):
         super(UTCDesignator, self).__init__("Z", UTCOffset)
 
     def read(self, m):
-        if super(Designator, self).read(m):
-            m.stack.append(UTC)
+        super(Designator, self).read(m)
+        m.stack.append(UTC)
+        return True
 
 Z = UTCDesignator()
 
@@ -92,7 +103,10 @@ class Element(FormatOp):
             digits = match.group(0)
             m.stack.append(self.cls(int(digits), signed=self.signed))
             m.i += len(digits)
+            m.merge = True
             return True
+        else:
+            raise StopFormat("expected digit; got [%s]" % m.input[m.i])
 
     def __eq__(self, other):
         return (isinstance(other, self.__class__) and
@@ -197,12 +211,6 @@ class Format(object):
                     break
         return "".join(self.stack)
 
-    def merge_top(self):
-        merged = self.stack[-2].merge(self.stack[-1])
-        if merged:
-            self.stack[-2:] = [merged]
-            return merged
-
     def read(self, string):
         self.input = string.upper()
         self.i = 0
@@ -210,12 +218,20 @@ class Format(object):
         ops = iter(self.ops)
         n = len(self.input)
         while self.i < n:
-            ops.next().read(self)
-            if len(self.stack) > 1:
-                self.merge_top()
+            if ops.next().read(self) and len(self.stack) > 1:
+                # Merge top two elements.
+                merged = self.stack[-2].merge(self.stack[-1])
+                if merged:
+                    self.stack[-2:] = [merged]
+
+        # Now we merge bottom-up.
         while len(self.stack) > 1:
-            if not self.merge_top():
-                raise StopFormat(self)
+            merged = self.stack[0].merge(self.stack[1])
+            if merged:
+                self.stack[0:2] = [merged]
+            else:
+                raise StopFormat("can't merge elements: %s" % self.stack[0:2])
+
         return self.stack[0]
 
 class InvalidTimeUnit(Exception):
@@ -453,6 +469,10 @@ class TimeRep(object):
         raise AttributeError("'%s' representation has no element '%s'" % \
                                  (self.__class__.__name__, name))
 
+    def __getitem__(self, key):
+        if isinstance(key, int):
+            return self.elements[key][0]
+
     def __iter__(self):
         for elt, cls in self.elements:
             if isinstance(elt, TimeRep):
@@ -540,7 +560,7 @@ class DateTime(Date, Time):
     def merge(self, other, destructive=False):
         if isinstance(other, (Hour, Minute, Second)):
             return DateTime(self.date, self.time.merge(other))
-        elif isinstance(other, DateTime):
+        elif isinstance(other, (DateTime, Duration)):
             return TimeInterval(self, other)
         else:
             return super(DateTime, self).merge(other, destructive)
@@ -572,6 +592,8 @@ class Duration(TimeRep):
     def merge(self, other, destructive=False):
         if isinstance(other, Weeks):
             return Duration(weeks=other)
+        elif isinstance(other, DateTime):
+            return TimeInterval(self, other)
         else:
             return super(Duration, self).merge(other, destructive)
 
@@ -581,20 +603,7 @@ class TimeInterval(DateTime):
 
     def __init__(self, *args):
         assert len(args) <= 2, "too many end-points for a time interval"
-        self.elements = args
-        if len(args) == 1:
-            if isinstance(args[0], Duration):
-                # a duration and context information (4.4.1 b)
-                TimeRep.__init__(self, args, (Duration,))
-            else:
-                raise ValueError("invalid interval: %s" % (args,))
-        else:
-            for i, point in (0, "start"), (1, "end"):
-                if isinstance(args[i], DateTime):
-                    setattr(self, point, args[i])
-                else:
-                    raise ValueError("invalid interval: %s" % (args,))
-            TimeRep.__init__(self, args, map(type, args))
+        TimeRep.__init__(self, args, map(type, args))
 
 class RecurringTimeInterval(TimeInterval):
     digits = {"n": int}
