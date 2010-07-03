@@ -132,51 +132,56 @@ class TestLocalTime(RepresentationTestCase):
     def test_complete(self):
         """4.2.2.2"""
         time = Time(23, 20, 50)
-        self.assertFormat("hhmmss", "232050", time, Time) # basic format
-        self.assertFormat("hh:mm:ss", "23:20:50", time, Time) # basic format
+        self.assertFormat("hhmmss", "232050", time) # basic format
+        self.assertFormat("hh:mm:ss", "23:20:50", time) # basic format
 
     def test_reduced(self):
         """4.2.2.3"""
         # a) A specific hour and minute
         time = Time(23, 20)
-        self.assertFormat("hhmm", "2320", time, Time) # basic format
-        self.assertFormat("hh:mm", "23:20", time, Time) # basic format
+        self.assertFormat("hhmm", "2320", time) # basic format
+        self.assertFormat("hh:mm", "23:20", time) # basic format
 
         # b) A specific hour
-        self.assertFormat("hh", "23", Hour(23), Time)
+        self.assertFormat("hh", "23", Hour(23))
 
     def test_decimal_fraction(self):
         """4.2.2.4"""
         # a) A specific hour, minute, and second and a decimal fraction of
         # the second
         time = Time(23, 20, 50.5)
-        self.assertFormat(u"hhmmss,ss̲", "232050,5", time, Time) # basic format
-        self.assertFormat(u"hh:mm:ss,ss̲", "23:20:50,5", time, Time) # extended
+        self.assertFormat(u"hhmmss,ss̲", "232050,5", time) # basic format
+        self.assertFormat(u"hh:mm:ss,ss̲", "23:20:50,5", time) # extended
 
         # b) A specific hour and minute and a decimal fraction of the minute
         time = Time(23, 20.8)
-        self.assertFormat(u"hhmm,mm̲", "2320,8", time, Time) # basic format
-        self.assertFormat(u"hh:mm,mm̲", "23:20,8", time, Time) # extended format
+        self.assertFormat(u"hhmm,mm̲", "2320,8", time) # basic format
+        self.assertFormat(u"hh:mm,mm̲", "23:20,8", time) # extended format
 
         # c) A specific hour and a decimal fraction of the hour
-        self.assertFormat(u"hh,hh̲", "23,3", Time(23.3), Time)
+        self.assertFormat(u"hh,hh̲", "23,3", Time(23.3))
 
     def test_with_designator(self):
         """4.2.2.5"""
         time = Time(23, 20, 50)
         self.assertFormat("Thhmmss", "T232050", time)
+        self.assertFormat("Thh:mm:ss", "T23:20:50", time)
 
 class TestUTC(RepresentationTestCase):
     def test(self):
         """4.2.4"""
+        hhmmss = Time(23, 20, 30, offset=UTC)
+        hhmm = Time(23, 20, offset=UTC)
+        hh = Time(23, offset=UTC)
+
         # Basic format
-        self.assertFormat("hhmmssZ", "232030Z", Time(23, 20, 30, offset=UTC), Time)
-        self.assertFormat("hhmmZ", "2320Z", Time(23, 20, offset=UTC), Time)
-        self.assertFormat("hhZ", "23Z", Time(23, offset=UTC), Time)
+        self.assertFormat("hhmmssZ", "232030Z", hhmmss)
+        self.assertFormat("hhmmZ", "2320Z", hhmm)
+        self.assertFormat("hhZ", "23Z", hh)
 
         # Extended format
-        self.assertFormat("hh:mm:ssZ", "23:20:30Z", Time(23, 20, 30, offset=UTC), Time)
-        self.assertFormat("hh:mmZ", "23:20Z", Time(23, 20, offset=UTC), Time)
+        self.assertFormat("hh:mm:ssZ", "23:20:30Z", hhmmss)
+        self.assertFormat("hh:mmZ", "23:20Z", hhmm)
 
 class TestLocalTimeAndUTC(RepresentationTestCase):
     def test_difference(self):
@@ -190,25 +195,22 @@ class TestLocalTimeAndUTC(RepresentationTestCase):
 
     def test_local_time_and_difference(self):
         """4.2.5.2"""
+        geneva_hhmm = Time(15, 27, 46, UTCOffset(1, 0))
+        geneva_hh = Time(15, 27, 46, UTCOffset(1))
+        new_york_hhmm = Time(15, 27, 46, UTCOffset(-5, 0))
+        new_york_hh = Time(15, 27, 46, UTCOffset(-5))
+
         # Basic format
-        self.assertFormat(u"hhmmss±hhmm", "152746+0100",
-                          Time(15, 27, 46, UTCOffset(1, 0)))
-        self.assertFormat(u"hhmmss±hhmm", "152746-0500",
-                          Time(15, 27, 46, UTCOffset(-5, 0)))
-        self.assertFormat(u"hhmmss±hh", "152746+01",
-                          Time(15, 27, 46, UTCOffset(1)))
-        self.assertFormat(u"hhmmss±hh", "152746-05",
-                          Time(15, 27, 46, UTCOffset(-5)))
+        self.assertFormat(u"hhmmss±hhmm", "152746+0100", geneva_hhmm)
+        self.assertFormat(u"hhmmss±hhmm", "152746-0500", new_york_hhmm)
+        self.assertFormat(u"hhmmss±hh", "152746+01", geneva_hh)
+        self.assertFormat(u"hhmmss±hh", "152746-05", new_york_hh)
 
         # Extended format
-        self.assertFormat(u"hh:mm:ss±hh:mm", "15:27:46+01:00",
-                          Time(15, 27, 46, UTCOffset(1, 0)))
-        self.assertFormat(u"hh:mm:ss±hh:mm", "15:27:46-05:00",
-                          Time(15, 27, 46, UTCOffset(-5, 0)))
-        self.assertFormat(u"hh:mm:ss±hh", "15:27:46+01",
-                          Time(15, 27, 46, UTCOffset(1)))
-        self.assertFormat(u"hh:mm:ss±hh", "15:27:46-05",
-                          Time(15, 27, 46, UTCOffset(-5)))
+        self.assertFormat(u"hh:mm:ss±hh:mm", "15:27:46+01:00", geneva_hhmm)
+        self.assertFormat(u"hh:mm:ss±hh:mm", "15:27:46-05:00", new_york_hhmm)
+        self.assertFormat(u"hh:mm:ss±hh", "15:27:46+01", geneva_hh)
+        self.assertFormat(u"hh:mm:ss±hh", "15:27:46-05", new_york_hh)
 
 def suite():
     return TestSuite([TestLoader().loadTestsFromTestCase(cls) \
