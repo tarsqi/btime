@@ -27,7 +27,7 @@ class TimeUnit(object):
                 raise InvalidTimeUnit(self, value)
             self.signed = m.group(1)
             self.value = int((self.signed if self.signed else "") + m.group(2))
-        elif isinstance(value, int):
+        elif value is None or isinstance(value, int):
             self.signed = signed
             self.value = value
         elif isinstance(value, TimeUnit):
@@ -40,6 +40,8 @@ class TimeUnit(object):
 
     def isvalid(self):
         """Check that an ordinal value is within the valid range."""
+        if self.value is None:
+            return True # None is always a valid value
         if len(self.range) == 1:
             minvalue, = self.range
             return minvalue <= abs(self.value)
@@ -49,6 +51,9 @@ class TimeUnit(object):
 
     def __int__(self):
         return self.value
+
+    def __nonzero__(self):
+        return self.value is not None
 
     def __neg__(self):
         return self.__class__(-self.value)
@@ -134,7 +139,7 @@ class Hour(TimeUnit):
             else:
                 return Time(self, other)
         elif isinstance(other, UTCOffset):
-            return Time(self, offset=other)
+            return Time(self, None, None, other)
 
 class Minute(TimeUnit):
     range = (0, 59)
@@ -175,9 +180,8 @@ class Recurrences(Cardinal):
     pass
 
 def ensure_class(obj, cls):
-    """Ensure that obj is an instance of cls. If either obj or cls is None,
-    that's fine, too."""
-    return obj if obj is None or cls is None or isinstance(obj, cls) \
+    """Ensure that obj is an instance of cls. If cls is None, skip the check."""
+    return obj if cls is None or isinstance(obj, cls) \
                else cls(obj)
 
 def units(*units):
@@ -185,8 +189,8 @@ def units(*units):
     have the correct units."""
     def ensure_arg_units(method):
         @wraps(method)
-        def wrapper(self, *args, **kwargs):
-            return method(self, *map(ensure_class, args, units), **kwargs)
+        def wrapper(self, *args):
+            return method(self, *map(ensure_class, args, units))
         return wrapper
     return ensure_arg_units
 
@@ -201,8 +205,8 @@ class TimeRep(object):
     designators = {}
     separators = {}
 
-    def __init__(self, elements, element_types):
-        self.elements = list(zip(chain(elements, repeat(None)), element_types))
+    def __init__(self, *elements):
+        self.elements = list(elements)
 
     def check_accuracy(self, *elements):
         """Given a list of elements in most-significant-first order, check
@@ -217,29 +221,30 @@ class TimeRep(object):
         self.reduced_accuracy = lse < len(elements) - 1
 
     def copy(self):
-        return self.__class__(*(map(lambda x: x[0], self.elements)))
+        return self.__class__(*self.elements)
 
     def merge(self, other, destructive=False):
         if isinstance(other, self.__class__):
             merged = self if destructive else self.copy()
-            for i, (elt, cls) in enumerate(merged.elements):
+            for i, elt in enumerate(merged.elements):
                 merged.elements[i] = merged.elements[i] if elt \
                                                         else other.elements[i]
             return merged
-        for i, (elt, cls) in enumerate(self.elements):
-            if isinstance(other, cls):
-                merged = self if destructive else self.copy()
-                merged.elements[i] = (other, cls)
-                return merged
+        else:
+            for i, elt in enumerate(self.elements):
+                if isinstance(other, elt.__class__):
+                    merged = self if destructive else self.copy()
+                    merged.elements[i] = other
+                    return merged
 
     def nmerge(self, other):
         return self.merge(other, True)
 
     def __getattr__(self, name):
-        for elt, cls in self.elements:
-            if any(c.__name__.lower() == name for c in cls.__mro__):
+        for elt in self.elements:
+            if any(c.__name__.lower() == name for c in elt.__class__.__mro__):
                 return elt
-        for elt, cls in self.elements:
+        for elt in self.elements:
             if isinstance(elt, TimeRep):
                 attr = getattr(elt, name, None)
                 if attr:
@@ -249,15 +254,15 @@ class TimeRep(object):
 
     def __getitem__(self, key):
         if isinstance(key, int):
-            return self.elements[key][0]
+            return self.elements[key]
 
     def __iter__(self):
-        for elt, cls in self.elements:
+        for elt in self.elements:
             if isinstance(elt, TimeRep):
                 for x in elt:
                     yield x
             else:
-                yield (elt, cls)
+                yield elt
 
     def __eq__(self, other):
         return all(map(eq, self, other))
@@ -280,18 +285,18 @@ class Date(TimePoint):
 class CalendarDate(Date):
     digits = {"Y": Year, "M": Month, "D": DayOfMonth}
 
-    @units(Year, Month, DayOfMonth)
+    @units(Year, Month, Day)
     def __init__(self, *args):
         self.check_accuracy(*args)
-        super(CalendarDate, self).__init__(args, (Year, Month, Day))
+        super(CalendarDate, self).__init__(*args)
 
 class OrdinalDate(Date):
     digits = {"Y": Year, "D": DayOfYear}
 
-    @units(Year, DayOfYear)
+    @units(Year, Day)
     def __init__(self, *args):
         self.check_accuracy(*args)
-        super(OrdinalDate, self).__init__(args, (Year, Day))
+        super(OrdinalDate, self).__init__(*args)
 
 class WeekDate(Date):
     digits = {"Y": Year, "w": Week, "D": DayOfWeek}
@@ -299,7 +304,7 @@ class WeekDate(Date):
     @units(Year, Week, Day)
     def __init__(self, *args):
         self.check_accuracy(*args)
-        super(WeekDate, self).__init__(args, (Year, Week, Day))
+        super(WeekDate, self).__init__(*args)
 
 class UTCOffset(TimePoint):
     digits = {"h": Hour, "m": Minute}
@@ -307,7 +312,7 @@ class UTCOffset(TimePoint):
     @units(Hour, Minute)
     def __init__(self, hour=0, minute=None):
         self.check_accuracy(hour, minute)
-        super(UTCOffset, self).__init__((hour, minute), (Hour, Minute))
+        super(UTCOffset, self).__init__(hour, minute)
 
 UTC = UTCOffset(0)
 
@@ -316,11 +321,10 @@ class Time(TimePoint):
     designators = {"T": None, "Z": UTC}
     separators = {":": False}
 
-    @units(Hour, Minute, Second)
+    @units(Hour, Minute, Second, UTCOffset)
     def __init__(self, hour=None, minute=None, second=None, offset=None):
         self.check_accuracy(hour, minute, second)
-        super(Time, self).__init__((hour, minute, second, offset),
-                                   (Hour, Minute, Second, UTCOffset))
+        super(Time, self).__init__(hour, minute, second, offset)
 
     def merge(self, other, destructive=False):
         if isinstance(other, Hour) and other.signed:
@@ -334,7 +338,7 @@ class DateTime(Date, Time):
     @units(Date, Time)
     def __init__(self, date, time):
         self.check_accuracy(date, time)
-        TimeRep.__init__(self, (date, time), (Date, Time))
+        TimeRep.__init__(self, date, time)
 
     def merge(self, other, destructive=False):
         if isinstance(other, (Hour, Minute, Second, UTCOffset)):
@@ -351,8 +355,7 @@ class TimeDuration(TimeRep):
     @units(Hours, Minutes, Seconds)
     def __init__(self, hours=0, minutes=0, seconds=0):
         self.check_accuracy(hours, minutes, seconds)
-        super(TimeDuration, self).__init__((hours, minutes, seconds),
-                                           (Hours, Minutes, Seconds))
+        super(TimeDuration, self).__init__(hours, minutes, seconds)
 
 class Duration(TimeRep):
     digits = {"n": TimeUnit}
@@ -362,9 +365,7 @@ class Duration(TimeRep):
     @units(Years, Months, Days, Hours, Minutes, Seconds)
     def __init__(self, *args):
         self.check_accuracy(*args)
-        super(Duration, self).__init__(args,
-                                       (Years, Months, Days,
-                                        Hours, Minutes, Seconds))
+        super(Duration, self).__init__(*args)
 
     def merge(self, other, destructive=False):
         if isinstance(other, Weeks):
@@ -380,7 +381,7 @@ class Duration(TimeRep):
 class WeeksDuration(Duration):
     @units(Weeks)
     def __init__(self, weeks=None):
-        super(Duration, self).__init__((weeks,), (Weeks,))
+        super(Duration, self).__init__(weeks)
 
 class TimeInterval(DateTime):
     designators = {"P": Duration}
@@ -388,20 +389,20 @@ class TimeInterval(DateTime):
 
     def __init__(self, *args):
         assert len(args) <= 2, "too many end-points for a time interval"
-        TimeRep.__init__(self, args, map(type, args))
+        TimeRep.__init__(self, *args)
 
 class RecurringTimeInterval(TimeInterval):
     digits = {"n": Recurrences}
     designators = {"R": None} # will be RecurringTimeInterval; see below
 
     @units(Recurrences)
-    def __init__(self, n=None, *args):
+    def __init__(self, *args):
         assert len(args) <= 3
-        TimeRep.__init__(self, (n,) + args, [Recurrences] + map(type, args))
+        TimeRep.__init__(self, *args)
 
     def merge(self, other, destructive=False):
         if isinstance(other, (DateTime, Duration)):
-            return RecurringTimeInterval(*(map(lambda x: x[0], self.elements) + [other]))
+            return RecurringTimeInterval(*(self.elements + [other]))
         else:
             return super(RecurringTimeInterval, self).merge(other, destructive)
 
@@ -512,8 +513,8 @@ class Element(FormatOp):
                                        self.min, self.max or ""))
 
     def format(self, m):
-        elt, cls = m.input.next()
-        if elt and issubclass(cls, self.cls):
+        elt = m.input.next()
+        if elt and issubclass(elt.__class__, self.cls):
             value = int(elt)
             m.stack.append((m.separators.pop() if m.separators else "") +
                            (("-" if value<0 else "+") if self.signed else "") +
@@ -624,7 +625,7 @@ class Format(object):
         if isinstance(timerep, TimeRep):
             self.input = iter(timerep)
         elif isinstance(timerep, TimeUnit):
-            self.input = iter([(timerep, type(timerep))])
+            self.input = iter([timerep])
         ops = iter(self.ops); op = ops.next()
         while True:
             # Fops can decline to format an element; this is used to elide

@@ -170,9 +170,9 @@ class TestLocalTime(RepresentationTestCase):
 class TestUTC(RepresentationTestCase):
     def test(self):
         """4.2.4"""
-        hhmmss = Time(23, 20, 30, offset=UTC)
-        hhmm = Time(23, 20, offset=UTC)
-        hh = Time(23, offset=UTC)
+        hhmmss = Time(23, 20, 30, UTC)
+        hhmm = Time(23, 20, None, UTC)
+        hh = Time(23, None, None, UTC)
 
         # Basic format
         self.assertFormat("hhmmssZ", "232030Z", hhmmss)
