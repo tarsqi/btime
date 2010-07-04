@@ -212,6 +212,75 @@ class TestLocalTimeAndUTC(RepresentationTestCase):
         self.assertFormat(u"hh:mm:ss±hh", "15:27:46+01", geneva_hh)
         self.assertFormat(u"hh:mm:ss±hh", "15:27:46-05", new_york_hh)
 
+class TestDateTime(RepresentationTestCase):
+    def test_complete(self):
+        """4.3.2"""
+        date = CalendarDate(1985, 4, 12)
+        time = Time(10, 15, 30)
+        offset_hhmm = UTCOffset(4, 0)
+        offset_hh = UTCOffset(4)
+
+        # Basic format
+        self.assertFormat(u"YYYYMMDDThhmmss",
+                          u"19850412T101530",
+                          DateTime(date, time))
+        self.assertFormat(u"YYYYMMDDThhmmssZ",
+                          u"19850412T101530Z",
+                          DateTime(date, time.merge(UTC)))
+        self.assertFormat(u"YYYYMMDDThhmmss±hhmm",
+                          u"19850412T101530+0400",
+                          DateTime(date, time.merge(offset_hhmm)))
+        self.assertFormat(u"YYYYMMDDThhmmss±hh",
+                          u"19850412T101530+04",
+                          DateTime(date, time.merge(offset_hh)))
+
+        # Extended format
+        self.assertFormat(u"YYYY-MM-DDThh:mm:ss",
+                          u"1985-04-12T10:15:30",
+                          DateTime(date, time))
+        self.assertFormat(u"YYYY-MM-DDThh:mm:ssZ",
+                          u"1985-04-12T10:15:30Z",
+                          DateTime(date, time.merge(UTC)))
+        self.assertFormat(u"YYYY-MM-DDThh:mm:ss±hh:mm",
+                          u"1985-04-12T10:15:30+04:00",
+                          DateTime(date, time.merge(offset_hhmm)))
+        self.assertFormat(u"YYYY-MM-DDThh:mm:ss±hh",
+                          u"1985-04-12T10:15:30+04",
+                          DateTime(date, time.merge(offset_hh)))
+
+    def test_reduced(self):
+        """4.3.3"""
+        caldate = CalendarDate(1985, 4, 12)
+        orddate = OrdinalDate(1985, 102)
+        weekdate = WeekDate(1985, 15, 5)
+        time = Time(10, 15)
+        offset_hhmm = UTCOffset(4, 0)
+        offset_hh = UTCOffset(4)
+
+        # a) Calendar date and local time
+        self.assertFormat(u"YYYYMMDDThhmm", # basic format
+                          u"19850412T1015",
+                          DateTime(caldate, time))
+        self.assertFormat(u"YYYY-MM-DDThh:mm", # extended format
+                          u"1985-04-12T10:15",
+                          DateTime(caldate, time))
+
+        # b) Ordinal date and UTC of day
+        self.assertFormat(u"YYYYDDDThhmmZ", # basic format
+                          u"1985102T1015Z",
+                          DateTime(orddate, time.merge(UTC)))
+        self.assertFormat(u"YYYY-DDDThh:mmZ", # extended format
+                          u"1985-102T10:15Z",
+                          DateTime(orddate, time.merge(UTC)))
+
+        # c) Week date and local time and the difference from UTC
+        self.assertFormat(u"YYYYWwwDThhmm±hhmm", # basic format
+                          u"1985W155T1015+0400",
+                          DateTime(weekdate, time.merge(offset_hhmm)))
+        self.assertFormat(u"YYYY-Www-DThh:mm±hh", # extended format
+                          u"1985-W15-5T10:15+04",
+                          DateTime(weekdate, time.merge(offset_hh)))
+
 def suite():
     return TestSuite([TestLoader().loadTestsFromTestCase(cls) \
                           for cls in (TestFormatReprParser,
@@ -220,7 +289,8 @@ def suite():
                                       TestWeekDate,
                                       TestLocalTime,
                                       TestUTC,
-                                      TestLocalTimeAndUTC,)])
+                                      TestLocalTimeAndUTC,
+                                      TestDateTime,)])
 
 def run(runner=TextTestRunner, **args):
     return runner(**args).run(suite())
