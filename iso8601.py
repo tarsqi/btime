@@ -334,7 +334,7 @@ class DateTime(Date, Time):
         TimeRep.__init__(self, (date, time), (Date, Time))
 
     def merge(self, other, destructive=False):
-        if isinstance(other, (Hour, Minute, Second)):
+        if isinstance(other, (Hour, Minute, Second, UTCOffset)):
             return DateTime(self.date, self.time.merge(other))
         elif isinstance(other, (DateTime, Duration)):
             return TimeInterval(self, other)
