@@ -143,8 +143,8 @@ class Second(TimeUnit):
     range = (0, 60) # don't forget leap seconds!
 
 class Cardinal(TimeUnit):
-    def __init__(self, value):
-        super(Cardinal, self).__init__(value, False)
+    def __init__(self, value, signed=False):
+        super(Cardinal, self).__init__(value, signed)
 
 class Years(Cardinal, Year):
     def merge(self, other, destructive=False):
@@ -169,6 +169,9 @@ class Minutes(Cardinal, Minute):
     pass
 
 class Seconds(Cardinal, Second):
+    pass
+
+class Recurrences(Cardinal):
     pass
 
 def ensure_class(obj, cls):
@@ -196,7 +199,7 @@ class TimeRep(object):
 
     digits = {}
     designators = {}
-    separators = []
+    separators = {}
 
     def __init__(self, elements, element_types):
         self.elements = list(zip(chain(elements, repeat(None)), element_types))
@@ -265,8 +268,8 @@ class TimePoint(TimeRep):
 class Date(TimePoint):
     digits = {"Y": Year, "M": Month, "D": Day, "w": Week}
     designators = {"W": None} # for week date
-    separators = [u"-", # hyphen-minus (a.k.a. ASCII hyphen, U+002D)
-                  u"‐"] # hyphen (U+2010)
+    separators = {u"-": False, # hyphen-minus (a.k.a. ASCII hyphen, U+002D)
+                  u"‐": False} # hyphen (U+2010)
 
     def merge(self, other, destructive=False):
         if isinstance(other, Time):
@@ -311,7 +314,7 @@ UTC = UTCOffset(0)
 class Time(TimePoint):
     digits = {"h": Hour, "m": Minute, "s": Second}
     designators = {"T": None, "Z": UTC}
-    separators = [":"]
+    separators = {":": False}
 
     @units(Hour, Minute, Second)
     def __init__(self, hour=None, minute=None, second=None, offset=None):
@@ -381,23 +384,30 @@ class WeeksDuration(Duration):
 
 class TimeInterval(DateTime):
     designators = {"P": Duration}
-    separators = ["/"]
+    separators = {"/": True}
 
     def __init__(self, *args):
         assert len(args) <= 2, "too many end-points for a time interval"
         TimeRep.__init__(self, args, map(type, args))
 
 class RecurringTimeInterval(TimeInterval):
-    digits = {"n": int}
-    designators = {"R": None}
+    digits = {"n": Recurrences}
+    designators = {"R": None} # will be RecurringTimeInterval; see below
 
-    def __init__(self, n, *args):
-        if n is not None and n < 0:
-            raise ValueError("invalid number of recurrences %d" % n)
-        super(RecurringTimeInterval, self).__init__(*args)
-        self.n = n
-        # Ack! Kludge! Yuck!
-        self.elements = [(self.n, int)] + self.elements
+    @units(Recurrences)
+    def __init__(self, n=None, *args):
+        assert len(args) <= 3
+        TimeRep.__init__(self, (n,) + args, [Recurrences] + map(type, args))
+
+    def merge(self, other, destructive=False):
+        if isinstance(other, (DateTime, Duration)):
+            return RecurringTimeInterval(*(map(lambda x: x[0], self.elements) + [other]))
+        else:
+            return super(RecurringTimeInterval, self).merge(other, destructive)
+
+# We can't do this assignment in the class definition above, because the
+# class doesn't exist at that time.
+RecurringTimeInterval.designators["R"] = RecurringTimeInterval
 
 class StopFormat(Exception):
     pass
@@ -572,7 +582,7 @@ class FormatReprParser(object):
             if char in cls.separators:
                 for i in range(level):
                     self.stack.pop()
-                return Separator(char, level > 0)
+                return Separator(char, cls.separators[char])
 
     def element(self, char):
         """Consume as many of the same digit-representing characters as
@@ -633,7 +643,7 @@ class Format(object):
         ops = iter(self.ops)
         n = len(self.input)
         while self.i < n:
-            if ops.next().read(self) and len(self.stack) > 1:
+            if ops.next().read(self) and len(self.stack) > 1 and self.stack[-1]:
                 if self.stack[-2] is None:
                     # Delete left-over hard separator.
                     del self.stack[-2]
