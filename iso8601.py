@@ -449,7 +449,7 @@ class Designator(Literal):
         super(Designator, self).read(m)
         if self.cls:
             m.stack.append(self.cls())
-        return False
+        return True
 
     def __eq__(self, other):
         return super(Designator, self).__eq__(other) and self.cls is other.cls
