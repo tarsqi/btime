@@ -213,6 +213,8 @@ class TestLocalTimeAndUTC(RepresentationTestCase):
         self.assertFormat(u"hh:mm:ss±hh", "15:27:46-05", new_york_hh)
 
 class TestDateTime(RepresentationTestCase):
+    """Section 4.3."""
+
     def test_complete(self):
         """4.3.2"""
         date = CalendarDate(1985, 4, 12)
@@ -281,6 +283,61 @@ class TestDateTime(RepresentationTestCase):
                           u"1985-W15-5T10:15+04",
                           DateTime(weekdate, time.merge(offset_hh)))
 
+class TestTimeInterval(RepresentationTestCase):
+    """Section 4.4."""
+
+    def test_start_and_end(self):
+        """4.4.4.1"""
+        interval = TimeInterval(DateTime(CalendarDate(1985, 4, 12),
+                                         Time(23, 20, 50)),
+                                DateTime(CalendarDate(1985, 6, 25),
+                                         Time(10, 30, 00)))
+        # Basic format
+        self.assertFormat(u"YYYYMMDDThhmmss/YYYYMMDDThhmmss",
+                          u"19850412T232050/19850625T103000",
+                          interval)
+        # Extended format
+        self.assertFormat(u"YYYY-MM-DDThh:mm:ss/YYYY-MM-DDThh:mm:ss",
+                          u"1985-04-12T23:20:50/1985-06-25T10:30:00",
+                          interval)
+
+    def test_duration_with_designators(self):
+        """4.4.4.2.1"""
+        self.assertFormat(u"Pnn̲Ynn̲Mnn̲DTnn̲Hnn̲Mnn̲S",
+                          u"P2Y10M15DT10H30M20S",
+                          Duration(2, 10, 15, 10, 30, 20))
+        self.assertFormat(u"Pnn̲W", "P6W", WeeksDuration(6))
+
+    def test_start_and_duration(self):
+        """4.4.4.3"""
+        interval = TimeInterval(DateTime(CalendarDate(1985, 4, 12),
+                                         Time(23, 20, 50)),
+                                Duration(1, 2, 15, 12, 30, 0))
+
+        # Basic format
+        self.assertFormat(u"YYYYMMDDThhmmss/Pnn̲Ynn̲Mnn̲DTnn̲Hnn̲Mnn̲S",
+                          u"19850412T232050/P1Y2M15DT12H30M0S",
+                          interval)
+        # Extended format
+        self.assertFormat(u"YYYY-MM-DDThh:mm:ss/Pnn̲Ynn̲Mnn̲DTnn̲Hnn̲Mnn̲S",
+                          u"1985-04-12T23:20:50/P1Y2M15DT12H30M0S",
+                          interval)
+
+    def test_duration_and_end(self):
+        """4.4.4.4"""
+        interval = TimeInterval(Duration(1, 2, 15, 12, 30, 0),
+                                DateTime(CalendarDate(1985, 4, 12),
+                                         Time(23, 20, 50)))
+
+        # Basic format
+        self.assertFormat(u"Pnn̲Ynn̲Mnn̲DTnn̲Hnn̲Mnn̲S/YYYYMMDDThhmmss",
+                          u"P1Y2M15DT12H30M0S/19850412T232050",
+                          interval)
+        # Extended format
+        self.assertFormat(u"Pnn̲Ynn̲Mnn̲DTnn̲Hnn̲Mnn̲S/YYYY-MM-DDThh:mm:ss",
+                          u"P1Y2M15DT12H30M0S/1985-04-12T23:20:50",
+                          interval)
+
 def suite():
     return TestSuite([TestLoader().loadTestsFromTestCase(cls) \
                           for cls in (TestFormatReprParser,
@@ -290,7 +347,8 @@ def suite():
                                       TestLocalTime,
                                       TestUTC,
                                       TestLocalTimeAndUTC,
-                                      TestDateTime,)])
+                                      TestDateTime,
+                                      TestTimeInterval)])
 
 def run(runner=TextTestRunner, **args):
     return runner(**args).run(suite())
