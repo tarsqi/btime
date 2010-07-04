@@ -9,7 +9,7 @@ class TestFormatReprParser(TestCase):
         """Dummy time element."""
         digits = {"X": TimeUnit}
         designators = {"T": Time}
-        separators = ["-"]
+        separators = {"-": False}
 
     def assertFormatRepr(self, format_repr, op):
         parser = FormatReprParser(self.X, format_repr)
@@ -338,6 +338,37 @@ class TestTimeInterval(RepresentationTestCase):
                           u"P1Y2M15DT12H30M0S/1985-04-12T23:20:50",
                           interval)
 
+class TestRucurringTimeInterval(RepresentationTestCase):
+    """Section 4.5."""
+
+    def test_complete(self):
+        """4.5.3"""
+        april_4 = DateTime(CalendarDate(1985, 4, 12), Time(23, 20, 50))
+        june_25 = DateTime(CalendarDate(1985, 6, 25), Time(10, 30, 00))
+        duration = Duration(1, 2, 15, 12, 30, 0)
+
+        # Basic format
+        self.assertFormat(u"Rn̲/YYYYMMDDThhmmss/YYYYMMDDThhmmss",
+                          u"R12/19850412T232050/19850625T103000",
+                          RecurringTimeInterval(12, april_4, june_25))
+        self.assertFormat(u"Rn̲/YYYYMMDDThhmmss/Pnn̲Ynn̲Mnn̲DTnn̲Hnn̲Mnn̲S",
+                          u"R12/19850412T232050/P1Y2M15DT12H30M0S",
+                          RecurringTimeInterval(12, april_4, duration))
+        self.assertFormat(u"Rn̲/Pnn̲Ynn̲Mnn̲DTnn̲Hnn̲Mnn̲S/YYYYMMDDThhmmss",
+                          u"R12/P1Y2M15DT12H30M0S/19850412T232050",
+                          RecurringTimeInterval(12, duration, april_4))
+
+        # Extended format
+        self.assertFormat(u"Rn̲/YYYY-MM-DDThh:mm:ss/YYYY-MM-DDThh:mm:ss",
+                          u"R12/1985-04-12T23:20:50/1985-06-25T10:30:00",
+                          RecurringTimeInterval(12, april_4, june_25))
+        self.assertFormat(u"Rn̲/YYYY-MM-DDThh:mm:ss/Pnn̲Ynn̲Mnn̲DTnn̲Hnn̲Mnn̲S",
+                          u"R12/1985-04-12T23:20:50/P1Y2M15DT12H30M0S",
+                          RecurringTimeInterval(12, april_4, duration))
+        self.assertFormat(u"Rn̲/Pnn̲Ynn̲Mnn̲DTnn̲Hnn̲Mnn̲S/YYYY-MM-DDThh:mm:ss",
+                          u"R12/P1Y2M15DT12H30M0S/1985-04-12T23:20:50",
+                          RecurringTimeInterval(12, duration, april_4))
+
 def suite():
     return TestSuite([TestLoader().loadTestsFromTestCase(cls) \
                           for cls in (TestFormatReprParser,
@@ -348,7 +379,8 @@ def suite():
                                       TestUTC,
                                       TestLocalTimeAndUTC,
                                       TestDateTime,
-                                      TestTimeInterval)])
+                                      TestTimeInterval,
+                                      TestRucurringTimeInterval)])
 
 def run(runner=TextTestRunner, **args):
     return runner(**args).run(suite())
