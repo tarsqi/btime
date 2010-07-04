@@ -356,22 +356,28 @@ class Duration(TimeRep):
     designators = {"W": Weeks, "Y": Years, "M": Months, "D": Days,
                    "T": TimeDuration}
 
-    @units(Years, Months, Days)
-    def __init__(self, years=0, months=0, days=0, weeks=None, time=None):
-        if weeks is not None:
-            super(Duration, self).__init__((weeks,), (Weeks,))
-        else:
-            self.check_accuracy(years, months, days, time)
-            super(Duration, self).__init__((years, months, days, time),
-                                           (Years, Months, Days, TimeDuration))
+    @units(Years, Months, Days, Hours, Minutes, Seconds)
+    def __init__(self, *args):
+        self.check_accuracy(*args)
+        super(Duration, self).__init__(args,
+                                       (Years, Months, Days,
+                                        Hours, Minutes, Seconds))
 
     def merge(self, other, destructive=False):
         if isinstance(other, Weeks):
-            return Duration(weeks=other)
+            return WeeksDuration(other) # weeks don't mix with other elements
+        elif isinstance(other, TimeDuration):
+            return Duration(self.years, self.months, self.days,
+                            other.hours, other.minutes, other.seconds)
         elif isinstance(other, DateTime):
             return TimeInterval(self, other)
         else:
             return super(Duration, self).merge(other, destructive)
+
+class WeeksDuration(Duration):
+    @units(Weeks)
+    def __init__(self, weeks=None):
+        super(Duration, self).__init__((weeks,), (Weeks,))
 
 class TimeInterval(DateTime):
     designators = {"P": Duration}
@@ -432,9 +438,21 @@ class Literal(FormatOp):
         return "%s(%r)" % (self.__class__.__name__, self.lit)
 
 class Separator(Literal):
+    def __init__(self, lit, hard=False):
+        super(Separator, self).__init__(lit)
+        self.hard = hard
+
     def format(self, m):
         m.separators.append(self.lit)
         return True
+
+    def read(self, m):
+        super(Separator, self).read(m)
+        if self.hard:
+            m.stack.append(None)
+            return True
+        else:
+            return False
 
 class Designator(Literal):
     def __init__(self, lit, cls):
@@ -554,7 +572,7 @@ class FormatReprParser(object):
             if char in cls.separators:
                 for i in range(level):
                     self.stack.pop()
-                return Separator(char)
+                return Separator(char, level > 0)
 
     def element(self, char):
         """Consume as many of the same digit-representing characters as
@@ -616,21 +634,22 @@ class Format(object):
         n = len(self.input)
         while self.i < n:
             if ops.next().read(self) and len(self.stack) > 1:
-                # Merge top two elements.
-                merged = self.stack[-2].merge(self.stack[-1])
-                if merged:
-                    self.stack[-2:] = [merged]
-                if debug:
-                    print self.stack
-
-        # Now we merge bottom-up.
-        while len(self.stack) > 1:
-            merged = self.stack[0].merge(self.stack[1])
-            if merged:
-                self.stack[0:2] = [merged]
-            else:
-                raise StopFormat("can't merge elements: %s" % self.stack[0:2])
+                if self.stack[-2] is None:
+                    # Delete left-over hard separator.
+                    del self.stack[-2]
+                else:
+                    merged = self.stack[-2].merge(self.stack[-1])
+                    if merged:
+                        self.stack[-2:] = [merged]
             if debug:
                 print self.stack
 
-        return self.stack[0]
+        # Now we merge bottom-up. These merges must all succeed.
+        obj = self.stack[0]
+        for i in range(1, len(self.stack)):
+            merged = obj.merge(self.stack[i])
+            if not merged:
+                raise StopFormat("can't merge elements: %s, %s" \
+                                     % (obj, self.stack[i]))
+            obj = merged
+        return obj
