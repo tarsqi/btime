@@ -13,8 +13,7 @@ class InvalidTimeUnit(Exception):
         self.value = value
 
     def __str__(self):
-        return "invalid %s: %s" % (self.unit.__class__.__name__.lower(),
-                                   self.value)
+        return "invalid %s %s" % (type(self.unit).__name__.lower(), self.value)
 
 class TimeUnit(object):
     range = (0,)
@@ -56,19 +55,19 @@ class TimeUnit(object):
         return self.value is not None
 
     def __neg__(self):
-        return self.__class__(-self.value)
+        return type(self)(-self.value)
 
     def __sub__(self, other):
         u"""Naïve subtraction (does not deal with underflow)."""
-        if isinstance(other, self.__class__):
-            return self.__class__(self.value - other.value)
+        if isinstance(other, type(self)):
+            return type(self)(self.value - other.value)
         elif isinstance(other, int):
-            return self.__class__(self.value - other)
+            return type(self)(self.value - other)
         else:
             return NotImplemented
 
     def __eq__(self, other):
-        if isinstance(other, self.__class__):
+        if isinstance(other, type(self)):
             return self.value == other.value
         elif isinstance(other, int):
             return self.value == other
@@ -76,7 +75,7 @@ class TimeUnit(object):
             return NotImplemented
 
     def __ne__(self, other):
-        if isinstance(other, self.__class__):
+        if isinstance(other, type(self)):
             return self.value != other.value
         elif isinstance(other, int):
             return self.value != other
@@ -84,7 +83,7 @@ class TimeUnit(object):
             return NotImplemented
 
     def __lt__(self, other):
-        if isinstance(other, self.__class__):
+        if isinstance(other, type(self)):
             return self.value < other.value
         elif isinstance(other, int):
             return self.value < other
@@ -98,7 +97,7 @@ class TimeUnit(object):
         return str(self.value)
 
     def __repr__(self):
-        return "%s(%s)" % (self.__class__.__name__, self.value)
+        return "%s(%s)" % (type(self).__name__, self.value)
 
 class Year(TimeUnit):
     range = (0, 9999)
@@ -221,10 +220,10 @@ class TimeRep(object):
         self.reduced_accuracy = lse < len(elements) - 1
 
     def copy(self):
-        return self.__class__(*self.elements)
+        return type(self)(*self.elements)
 
     def merge(self, other, destructive=False):
-        if isinstance(other, self.__class__):
+        if isinstance(other, type(self)):
             merged = self if destructive else self.copy()
             for i, elt in enumerate(merged.elements):
                 merged.elements[i] = merged.elements[i] if elt \
@@ -232,7 +231,7 @@ class TimeRep(object):
             return merged
         else:
             for i, elt in enumerate(self.elements):
-                if isinstance(other, elt.__class__):
+                if isinstance(other, type(elt)):
                     merged = self if destructive else self.copy()
                     merged.elements[i] = other
                     return merged
@@ -242,7 +241,7 @@ class TimeRep(object):
 
     def __getattr__(self, name):
         for elt in self.elements:
-            if any(c.__name__.lower() == name for c in elt.__class__.__mro__):
+            if any(c.__name__.lower() == name for c in type(elt).__mro__):
                 return elt
         for elt in self.elements:
             if isinstance(elt, TimeRep):
@@ -250,7 +249,7 @@ class TimeRep(object):
                 if attr:
                     return attr
         raise AttributeError("'%s' representation has no element '%s'" % \
-                                 (self.__class__.__name__, name))
+                                 (type(self).__name__, name))
 
     def __getitem__(self, key):
         if isinstance(key, int):
@@ -443,10 +442,10 @@ class Literal(FormatOp):
 
     def __eq__(self, other):
         return ((isinstance(other, basestring) and self.lit == other.upper()) or
-                (isinstance(other, self.__class__) and self.lit == other.lit))
+                (isinstance(other, type(self)) and self.lit == other.lit))
 
     def __repr__(self):
-        return "%s(%r)" % (self.__class__.__name__, self.lit)
+        return "%s(%r)" % (type(self).__name__, self.lit)
 
 class Separator(Literal):
     def __init__(self, lit, hard=False):
@@ -514,7 +513,7 @@ class Element(FormatOp):
 
     def format(self, m):
         elt = m.input.next()
-        if elt and issubclass(elt.__class__, self.cls):
+        if elt and issubclass(type(elt), self.cls):
             value = int(elt)
             m.stack.append((m.separators.pop() if m.separators else "") +
                            (("-" if value<0 else "+") if self.signed else "") +
@@ -532,13 +531,13 @@ class Element(FormatOp):
             raise StopFormat("expected digit; got [%s]" % m.input[m.i])
 
     def __eq__(self, other):
-        return (isinstance(other, self.__class__) and
+        return (isinstance(other, type(self)) and
                 self.cls is other.cls and
                 self.min == other.min and
                 self.max == other.max)
 
     def __repr__(self):
-        return "%s(%s, %s, %s, %s)" % (self.__class__.__name__,
+        return "%s(%s, %s, %s, %s)" % (type(self).__name__,
                                        self.cls.__name__,
                                        self.min, self.max, self.signed)
 
