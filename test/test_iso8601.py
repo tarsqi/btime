@@ -9,7 +9,7 @@ class TestFormatReprParser(TestCase):
         """Dummy time element."""
         digits = {"X": TimeUnit}
         designators = {"T": Time}
-        separators = {"-": False}
+        separators = {u"‐": False}
 
     def assertFormatRepr(self, format_repr, op):
         parser = FormatReprParser(self.X, format_repr)
@@ -32,7 +32,7 @@ class TestFormatReprParser(TestCase):
 
     def test_separator(self):
         """Separator in format representation"""
-        self.assertFormatRepr("-", Separator("-"))
+        self.assertFormatRepr(u"‐", Separator(u"‐"))
 
     def test_designator(self):
         """Designator in format representation"""
@@ -63,19 +63,19 @@ class TestCalendarDate(RepresentationTestCase):
         """4.1.2.4"""
         # a) A specific day
         date = CalendarDate(1985, 4, 12)
-        self.assertFormat(u"±YYYYYYMMDD", "+0019850412", date) # basic format
-        self.assertFormat(u"±YYYYYY-MM-DD", "+001985-04-12", date) # extended
+        self.assertFormat(u"±YYYYYYMMDD", u"+0019850412", date) # basic format
+        self.assertFormat(u"±YYYYYY‐MM‐DD", u"+001985‐04‐12", date) # extended
 
         # b) A specific month
         month = CalendarDate(1985, 4)
-        self.assertFormat(u"±YYYYYYMM", "+00198504", month) # basic format
-        self.assertFormat(u"±YYYYYY-MM", "+001985-04", month) # extended format
+        self.assertFormat(u"±YYYYYYMM", u"+00198504", month) # basic format
+        self.assertFormat(u"±YYYYYY‐MM", u"+001985‐04", month) # extended format
 
         # c) A specific year
-        self.assertFormat(u"±YYYYYY", "+001985", Year(1985))
+        self.assertFormat(u"±YYYYYY", u"+001985", Year(1985))
 
         # d) A specific century
-        self.assertFormat(u"±YYYY", "+0019", Year(19)) # not actually a century
+        self.assertFormat(u"±YYYY", u"+0019", Year(19)) # not actually a century
 
 class TestOrdinalDate(RepresentationTestCase):
     """Section 4.1.3."""
@@ -83,14 +83,14 @@ class TestOrdinalDate(RepresentationTestCase):
     def test_complete(self):
         """4.1.3.2"""
         date = OrdinalDate(1985, 102)
-        self.assertFormat("YYYYDDD", "1985102", date) # basic format
-        self.assertFormat("YYYY-DDD", "1985-102", date) # extended format
+        self.assertFormat(u"YYYYDDD", u"1985102", date) # basic format
+        self.assertFormat(u"YYYY‐DDD", u"1985‐102", date) # extended format
 
     def test_expanded(self):
         """4.1.3.3"""
         date = OrdinalDate(1985, 102)
-        self.assertFormat(u"±YYYYYYDDD", "+001985102", date) # basic format
-        self.assertFormat(u"±YYYYYY-DDD", "+001985-102", date) # extended format
+        self.assertFormat(u"±YYYYYYDDD", u"+001985102", date) # basic format
+        self.assertFormat(u"±YYYYYY‐DDD", u"+001985‐102", date) # extended format
 
 class TestWeekDate(RepresentationTestCase):
     """Section 4.1.4."""
@@ -98,33 +98,33 @@ class TestWeekDate(RepresentationTestCase):
     def test_complete(self):
         """4.1.4.2"""
         date = WeekDate(1985, 15, 5)
-        self.assertFormat("YYYYWwwD", "1985W155", date) # basic format
-        self.assertFormat("YYYY-Www-D", "1985-W15-5", date) # extended format
+        self.assertFormat(u"YYYYWwwD", "1985W155", date) # basic format
+        self.assertFormat(u"YYYY‐Www‐D", u"1985‐W15‐5", date) # extended format
 
     def test_reduced(self):
         """4.1.4.3"""
         # A specific week
         week = WeekDate(1985, 15)
-        self.assertFormat("YYYYWww", "1985W15", week) # basic format
-        self.assertFormat("YYYY-Www", "1985-W15", week) # extended format
+        self.assertFormat(u"YYYYWww", "1985W15", week) # basic format
+        self.assertFormat(u"YYYY‐Www", u"1985‐W15", week) # extended format
 
     def test_expanded(self):
         """4.1.4.4"""
         # a) A specific day
         date = CalendarDate(1985, 4, 12)
-        self.assertFormat(u"±YYYYYYMMDD", "+0019850412", date) # basic format
-        self.assertFormat(u"±YYYYYY-MM-DD", "+001985-04-12", date) # extended
+        self.assertFormat(u"±YYYYYYMMDD", u"+0019850412", date) # basic format
+        self.assertFormat(u"±YYYYYY‐MM‐DD", u"+001985‐04‐12", date) # extended
 
         # b) A specific month
         month = CalendarDate(1985, 4)
-        self.assertFormat(u"±YYYYYYMM", "+00198504", month) # basic format
-        self.assertFormat(u"±YYYYYY-MM", "+001985-04", month) # extended format
+        self.assertFormat(u"±YYYYYYMM", u"+00198504", month) # basic format
+        self.assertFormat(u"±YYYYYY‐MM", u"+001985‐04", month) # extended format
 
         # c) A specific year
-        self.assertFormat(u"±YYYYYY", "+001985", Year(1985))
+        self.assertFormat(u"±YYYYYY", u"+001985", Year(1985))
 
         # d) A specific century
-        self.assertFormat(u"±YYYY", "+0019", Year(19)) # not actually a century
+        self.assertFormat(u"±YYYY", u"+0019", Year(19)) # not actually a century
 
 class TestLocalTime(RepresentationTestCase):
     """Section 4.2.2."""
@@ -237,17 +237,17 @@ class TestDateTime(RepresentationTestCase):
                           DateTime(date, time.merge(offset_hh)))
 
         # Extended format
-        self.assertFormat(u"YYYY-MM-DDThh:mm:ss",
-                          u"1985-04-12T10:15:30",
+        self.assertFormat(u"YYYY‐MM‐DDThh:mm:ss",
+                          u"1985‐04‐12T10:15:30",
                           DateTime(date, time))
-        self.assertFormat(u"YYYY-MM-DDThh:mm:ssZ",
-                          u"1985-04-12T10:15:30Z",
+        self.assertFormat(u"YYYY‐MM‐DDThh:mm:ssZ",
+                          u"1985‐04‐12T10:15:30Z",
                           DateTime(date, time.merge(UTC)))
-        self.assertFormat(u"YYYY-MM-DDThh:mm:ss±hh:mm",
-                          u"1985-04-12T10:15:30+04:00",
+        self.assertFormat(u"YYYY‐MM‐DDThh:mm:ss±hh:mm",
+                          u"1985‐04‐12T10:15:30+04:00",
                           DateTime(date, time.merge(offset_hhmm)))
-        self.assertFormat(u"YYYY-MM-DDThh:mm:ss±hh",
-                          u"1985-04-12T10:15:30+04",
+        self.assertFormat(u"YYYY‐MM‐DDThh:mm:ss±hh",
+                          u"1985‐04‐12T10:15:30+04",
                           DateTime(date, time.merge(offset_hh)))
 
     def test_reduced(self):
@@ -263,24 +263,24 @@ class TestDateTime(RepresentationTestCase):
         self.assertFormat(u"YYYYMMDDThhmm", # basic format
                           u"19850412T1015",
                           DateTime(caldate, time))
-        self.assertFormat(u"YYYY-MM-DDThh:mm", # extended format
-                          u"1985-04-12T10:15",
+        self.assertFormat(u"YYYY‐MM‐DDThh:mm", # extended format
+                          u"1985‐04‐12T10:15",
                           DateTime(caldate, time))
 
         # b) Ordinal date and UTC of day
         self.assertFormat(u"YYYYDDDThhmmZ", # basic format
                           u"1985102T1015Z",
                           DateTime(orddate, time.merge(UTC)))
-        self.assertFormat(u"YYYY-DDDThh:mmZ", # extended format
-                          u"1985-102T10:15Z",
+        self.assertFormat(u"YYYY‐DDDThh:mmZ", # extended format
+                          u"1985‐102T10:15Z",
                           DateTime(orddate, time.merge(UTC)))
 
         # c) Week date and local time and the difference from UTC
         self.assertFormat(u"YYYYWwwDThhmm±hhmm", # basic format
                           u"1985W155T1015+0400",
                           DateTime(weekdate, time.merge(offset_hhmm)))
-        self.assertFormat(u"YYYY-Www-DThh:mm±hh", # extended format
-                          u"1985-W15-5T10:15+04",
+        self.assertFormat(u"YYYY‐Www‐DThh:mm±hh", # extended format
+                          u"1985‐W15‐5T10:15+04",
                           DateTime(weekdate, time.merge(offset_hh)))
 
 class TestTimeInterval(RepresentationTestCase):
@@ -297,8 +297,8 @@ class TestTimeInterval(RepresentationTestCase):
                           u"19850412T232050/19850625T103000",
                           interval)
         # Extended format
-        self.assertFormat(u"YYYY-MM-DDThh:mm:ss/YYYY-MM-DDThh:mm:ss",
-                          u"1985-04-12T23:20:50/1985-06-25T10:30:00",
+        self.assertFormat(u"YYYY‐MM‐DDThh:mm:ss/YYYY‐MM‐DDThh:mm:ss",
+                          u"1985‐04‐12T23:20:50/1985‐06‐25T10:30:00",
                           interval)
 
     def test_duration_with_designators(self):
@@ -319,8 +319,8 @@ class TestTimeInterval(RepresentationTestCase):
                           u"19850412T232050/P1Y2M15DT12H30M0S",
                           interval)
         # Extended format
-        self.assertFormat(u"YYYY-MM-DDThh:mm:ss/Pnn̲Ynn̲Mnn̲DTnn̲Hnn̲Mnn̲S",
-                          u"1985-04-12T23:20:50/P1Y2M15DT12H30M0S",
+        self.assertFormat(u"YYYY‐MM‐DDThh:mm:ss/Pnn̲Ynn̲Mnn̲DTnn̲Hnn̲Mnn̲S",
+                          u"1985‐04‐12T23:20:50/P1Y2M15DT12H30M0S",
                           interval)
 
     def test_duration_and_end(self):
@@ -334,8 +334,8 @@ class TestTimeInterval(RepresentationTestCase):
                           u"P1Y2M15DT12H30M0S/19850412T232050",
                           interval)
         # Extended format
-        self.assertFormat(u"Pnn̲Ynn̲Mnn̲DTnn̲Hnn̲Mnn̲S/YYYY-MM-DDThh:mm:ss",
-                          u"P1Y2M15DT12H30M0S/1985-04-12T23:20:50",
+        self.assertFormat(u"Pnn̲Ynn̲Mnn̲DTnn̲Hnn̲Mnn̲S/YYYY‐MM‐DDThh:mm:ss",
+                          u"P1Y2M15DT12H30M0S/1985‐04‐12T23:20:50",
                           interval)
 
 class TestRucurringTimeInterval(RepresentationTestCase):
@@ -359,14 +359,14 @@ class TestRucurringTimeInterval(RepresentationTestCase):
                           RecurringTimeInterval(12, duration, april_4))
 
         # Extended format
-        self.assertFormat(u"Rn̲/YYYY-MM-DDThh:mm:ss/YYYY-MM-DDThh:mm:ss",
-                          u"R12/1985-04-12T23:20:50/1985-06-25T10:30:00",
+        self.assertFormat(u"Rn̲/YYYY‐MM‐DDThh:mm:ss/YYYY‐MM‐DDThh:mm:ss",
+                          u"R12/1985‐04‐12T23:20:50/1985‐06‐25T10:30:00",
                           RecurringTimeInterval(12, april_4, june_25))
-        self.assertFormat(u"Rn̲/YYYY-MM-DDThh:mm:ss/Pnn̲Ynn̲Mnn̲DTnn̲Hnn̲Mnn̲S",
-                          u"R12/1985-04-12T23:20:50/P1Y2M15DT12H30M0S",
+        self.assertFormat(u"Rn̲/YYYY‐MM‐DDThh:mm:ss/Pnn̲Ynn̲Mnn̲DTnn̲Hnn̲Mnn̲S",
+                          u"R12/1985‐04‐12T23:20:50/P1Y2M15DT12H30M0S",
                           RecurringTimeInterval(12, april_4, duration))
-        self.assertFormat(u"Rn̲/Pnn̲Ynn̲Mnn̲DTnn̲Hnn̲Mnn̲S/YYYY-MM-DDThh:mm:ss",
-                          u"R12/P1Y2M15DT12H30M0S/1985-04-12T23:20:50",
+        self.assertFormat(u"Rn̲/Pnn̲Ynn̲Mnn̲DTnn̲Hnn̲Mnn̲S/YYYY‐MM‐DDThh:mm:ss",
+                          u"R12/P1Y2M15DT12H30M0S/1985‐04‐12T23:20:50",
                           RecurringTimeInterval(12, duration, april_4))
 
 def suite():
