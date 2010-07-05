@@ -534,13 +534,13 @@ class Element(FormatOp):
             s += ("%0*d" % (self.min, whole))[0:self.max]
             if self.frac_min > 0:
                 s += self.separator
-                if frac:
+                if frac and isinstance(frac, Decimal):
                     q = (Decimal(10) ** -self.frac_max) if self.frac_max \
                                                         else frac
-                    sign, digits, exp = frac.quantize(q).as_tuple()
+                    exp = frac.quantize(q).as_tuple()[2]
                     frac *= Decimal(10) ** (-exp if -exp > self.frac_min \
                                                  else self.frac_min)
-                    s += "".join(str(int(frac)))[0:self.frac_max]
+                    s += "".join(str(int(frac)))
                 else:
                     # The scaling we do above won't work for 0; just fake it.
                     s += "0"*self.frac_min
