@@ -48,6 +48,9 @@ class TimeUnit(object):
             minvalue, maxvalue = self.range
             return minvalue <= abs(self.value) <= maxvalue
 
+    def merge(self, other):
+        return self or other
+
     def __int__(self):
         return self.value
 
@@ -98,6 +101,8 @@ class TimeUnit(object):
 
     def __repr__(self):
         return "%s(%s)" % (type(self).__name__, self.value)
+
+unit = TimeUnit(None)
 
 class Year(TimeUnit):
     range = (0, 9999)
@@ -459,7 +464,9 @@ class Separator(Literal):
     def read(self, m):
         super(Separator, self).read(m)
         if self.hard:
-            m.stack.append(None)
+            # By pushing the identity unit onto the stack, we can ensure that
+            # the previous element will not be merged with the next one.
+            m.stack.append(unit)
             return True
         else:
             return False
@@ -643,14 +650,10 @@ class Format(object):
         ops = iter(self.ops)
         n = len(self.input)
         while self.i < n:
-            if ops.next().read(self) and len(self.stack) > 1 and self.stack[-1]:
-                if self.stack[-2] is None:
-                    # Delete left-over hard separator.
-                    del self.stack[-2]
-                else:
-                    merged = self.stack[-2].merge(self.stack[-1])
-                    if merged:
-                        self.stack[-2:] = [merged]
+            if ops.next().read(self) and len(self.stack) > 1:
+                merged = self.stack[-2].merge(self.stack[-1])
+                if merged:
+                    self.stack[-2:] = [merged]
             if debug:
                 print self.stack
 
