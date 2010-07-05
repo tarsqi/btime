@@ -532,13 +532,13 @@ class Element(FormatOp):
             whole = abs(int(elt.value))
             frac = abs(elt.value) - whole
             s += ("%0*d" % (self.min, whole))[0:self.max]
-            if self.frac_min:
+            if self.frac_min > 0:
                 s += self.separator
                 if frac:
                     q = (Decimal(10) ** -self.frac_max) if self.frac_max \
                                                         else frac
                     sign, digits, exp = frac.quantize(q).as_tuple()
-                    frac *= Decimal(10) ** (-exp if exp > self.frac_min \
+                    frac *= Decimal(10) ** (-exp if -exp > self.frac_min \
                                                  else self.frac_min)
                     s += "".join(str(int(frac)))[0:self.frac_max]
                 else:

@@ -44,6 +44,41 @@ class TestFormatReprParser(TestCase):
         """Designator in format representation"""
         self.assertFormatRepr("T", Designator("T", Time))
 
+class TestElementFormat(TestCase):
+    class FormatOneOp(Format):
+        """A format machine with exactly one fop."""
+        def __init__(self, op):
+            self.ops = [op]
+
+    def assertElementFormat(self, string, value, *args):
+        m = self.FormatOneOp(Element(TimeUnit, *args))
+        self.assertEqual(m.format(TimeUnit(value)), string)
+
+    def test_min_width(self):
+        """Minimum element width"""
+        self.assertElementFormat("1234", 1234, (4, None))
+        self.assertElementFormat("0012", 12, (4, None))
+        self.assertElementFormat("0012", Decimal("12"), (4, None))
+
+    def test_max_width(self):
+        """Maximum element width"""
+        self.assertElementFormat("1234", 1234, (2, None))
+        self.assertElementFormat("12", 1234, (2, 2))
+        self.assertElementFormat("12", Decimal("1234"), (2, 2))
+
+    def test_min_frac_width(self):
+        """Minimum fractional width"""
+        d = Decimal("12.34")
+        self.assertElementFormat("12,00", int(d), (2, 2), (2, None))
+        self.assertElementFormat("12,34", d, (2, 2), (2, None))
+        self.assertElementFormat("12,3400", d, (2, 2), (4, None))
+
+    def test_max_frac_width(self):
+        """Maximum fractional width"""
+        d = Decimal("12.3456")
+        self.assertElementFormat("12,34", d, (2, 2), (2, 2))
+        self.assertElementFormat("12,3456", d, (2, 2), (2, None))
+
 class RepresentationTestCase(TestCase):
     def assertFormat(self, format_repr, representation, obj, syntax=None):
         format = Format(format_repr, syntax) if syntax else Format(format_repr)
@@ -378,6 +413,7 @@ class TestRucurringTimeInterval(RepresentationTestCase):
 def suite():
     return TestSuite([TestLoader().loadTestsFromTestCase(cls) \
                           for cls in (TestFormatReprParser,
+                                      TestElementFormat,
                                       TestCalendarDate,
                                       TestOrdinalDate,
                                       TestWeekDate,
