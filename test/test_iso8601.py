@@ -1,5 +1,6 @@
 # -*- mode: Python; coding: utf-8 -*-
 
+from decimal import Decimal
 from unittest import *
 
 from iso8601 import *
@@ -17,18 +18,23 @@ class TestFormatReprParser(TestCase):
 
     def test_element(self):
         """Time elements with min/max digits in format representation"""
-        self.assertFormatRepr(u"X̲", Element(TimeUnit, 0))
-        self.assertFormatRepr(u"_X", Element(TimeUnit, 0))
-        self.assertFormatRepr(u"X", Element(TimeUnit, 1, 1))
-        self.assertFormatRepr(u"XX̲", Element(TimeUnit, 1))
-        self.assertFormatRepr(u"X_X", Element(TimeUnit, 1))
-        self.assertFormatRepr(u"XXX̲", Element(TimeUnit, 2))
-        self.assertFormatRepr(u"XX_X", Element(TimeUnit, 2))
-        self.assertFormatRepr(u"XX", Element(TimeUnit, 2, 2))
+        self.assertFormatRepr(u"X̲", Element(TimeUnit, (0, None)))
+        self.assertFormatRepr(u"_X", Element(TimeUnit, (0, None)))
+        self.assertFormatRepr(u"X", Element(TimeUnit, (1, 1)))
+        self.assertFormatRepr(u"XX̲", Element(TimeUnit, (1, None)))
+        self.assertFormatRepr(u"X_X", Element(TimeUnit, (1, None)))
+        self.assertFormatRepr(u"XXX̲", Element(TimeUnit, (2, None)))
+        self.assertFormatRepr(u"XX_X", Element(TimeUnit, (2, None)))
+        self.assertFormatRepr(u"XX", Element(TimeUnit, (2, 2)))
 
     def test_signed_element(self):
         """Signed time element in format representation"""
-        self.assertFormatRepr(u"±XXXX", Element(TimeUnit, 4, 4, True))
+        self.assertFormatRepr(u"±XXXX", Element(TimeUnit, (4, 4), signed=True))
+
+    def test_fractional_element(self):
+        """Element with decimal fraction"""
+        self.assertFormatRepr(u"XX,XX̲", Element(TimeUnit, (2, 2), (1, None)))
+        self.assertFormatRepr(u"XX.XX", Element(TimeUnit, (2, 2), (2, 2), "."))
 
     def test_separator(self):
         """Separator in format representation"""
@@ -149,17 +155,17 @@ class TestLocalTime(RepresentationTestCase):
         """4.2.2.4"""
         # a) A specific hour, minute, and second and a decimal fraction of
         # the second
-        time = Time(23, 20, 50.5)
+        time = Time(23, 20, Decimal("50.5"))
         self.assertFormat(u"hhmmss,ss̲", "232050,5", time) # basic format
         self.assertFormat(u"hh:mm:ss,ss̲", "23:20:50,5", time) # extended
 
         # b) A specific hour and minute and a decimal fraction of the minute
-        time = Time(23, 20.8)
+        time = Time(23, Decimal("20.8"))
         self.assertFormat(u"hhmm,mm̲", "2320,8", time) # basic format
         self.assertFormat(u"hh:mm,mm̲", "23:20,8", time) # extended format
 
         # c) A specific hour and a decimal fraction of the hour
-        self.assertFormat(u"hh,hh̲", "23,3", Time(23.3))
+        self.assertFormat(u"hh,hh̲", "23,3", Hour(Decimal("23.3")))
 
     def test_with_designator(self):
         """4.2.2.5"""

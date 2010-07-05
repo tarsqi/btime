@@ -1,5 +1,6 @@
 # -*- mode: Python; coding: utf-8 -*-
 
+from decimal import Decimal
 from functools import wraps
 from itertools import chain, repeat, izip as zip
 from operator import eq
@@ -26,7 +27,7 @@ class TimeUnit(object):
                 raise InvalidTimeUnit(self, value)
             self.signed = m.group(1)
             self.value = int((self.signed if self.signed else "") + m.group(2))
-        elif value is None or isinstance(value, int):
+        elif value is None or isinstance(value, (int, Decimal)):
             self.signed = signed
             self.value = value
         elif isinstance(value, TimeUnit):
@@ -508,31 +509,55 @@ class UTCDesignator(Designator):
 Z = UTCDesignator()
 
 class Element(FormatOp):
-    def __init__(self, cls, min=0, max=None, signed=False):
+    def __init__(self, cls, digits, frac=(0,0), separator=",", signed=False):
         assert issubclass(cls, TimeUnit)
         self.cls = cls
-        self.min = min
-        self.max = max
+        self.min, self.max = digits
+        self.frac_min, self.frac_max = frac
+        self.separator = separator
         self.signed = signed
-        self.pattern = re.compile("(%s[0-9]{%d,%s})" % \
-                                      ("[+-]" if signed else "",
-                                       self.min, self.max or ""))
+        self.pattern = re.compile(("(%s[0-9]{%d,%s})" % \
+                                       ("[+-]" if signed else "",
+                                        self.min, self.max or "")) +
+                                  (("[.,]([0-9]{%d,%s})" % \
+                                        (self.frac_min, self.frac_max or "")) \
+                                       if self.frac_min else ""))
 
     def format(self, m):
         elt = m.input.next()
         if elt and issubclass(type(elt), self.cls):
-            value = int(elt)
-            m.stack.append((m.separators.pop() if m.separators else "") +
-                           (("-" if value<0 else "+") if self.signed else "") +
-                           ("%0*d" % (self.min, abs(value)))[0:self.max])
+            s = m.separators.pop() if m.separators else ""
+            if self.signed:
+                s += "-" if elt.value < 0 else "+"
+            whole = abs(int(elt.value))
+            frac = abs(elt.value) - whole
+            s += ("%0*d" % (self.min, whole))[0:self.max]
+            if self.frac_min:
+                s += self.separator
+                if frac:
+                    q = (Decimal(10) ** -self.frac_max) if self.frac_max \
+                                                        else frac
+                    sign, digits, exp = frac.quantize(q).as_tuple()
+                    frac *= Decimal(10) ** (-exp if exp > self.frac_min \
+                                                 else self.frac_min)
+                    s += "".join(str(int(frac)))[0:self.frac_max]
+                else:
+                    # The scaling we do above won't work for 0; just fake it.
+                    s += "0"*self.frac_min
+            m.stack.append(s)
             return True
 
     def read(self, m):
         match = self.pattern.match(m.input[m.i:])
         if match:
-            digits = match.group(0)
-            m.stack.append(self.cls(int(digits), signed=self.signed))
+            digits = match.group(1)
+            frac = match.group(2) if self.frac_min else None
+            m.stack.append(self.cls(Decimal(".".join((digits, frac))) \
+                                        if frac else int(digits),
+                                    signed=self.signed))
             m.i += len(digits)
+            if frac:
+                m.i += len(digits) + 1 # +1 for decimal separator
             return not self.signed # don't merge signed elements
         else:
             raise StopFormat("expected digit; got [%s]" % m.input[m.i])
@@ -541,12 +566,17 @@ class Element(FormatOp):
         return (isinstance(other, type(self)) and
                 self.cls is other.cls and
                 self.min == other.min and
-                self.max == other.max)
+                self.max == other.max and
+                self.frac_min == other.frac_min and
+                self.frac_max == other.frac_max and
+                self.signed == other.signed)
 
     def __repr__(self):
-        return "%s(%s, %s, %s, %s)" % (type(self).__name__,
-                                       self.cls.__name__,
-                                       self.min, self.max, self.signed)
+        return "%s(%s, (%s, %s), (%s, %s), %r, %r)" \
+            % (type(self).__name__, self.cls.__name__,
+               self.min, self.max,
+               self.frac_min, self.frac_max,
+               self.separator, self.signed)
 
 class FormatReprParser(object):
     def __init__(self, syntax, format_repr):
@@ -598,17 +628,30 @@ class FormatReprParser(object):
         if char == u"±":
             signed = True
             char = self.next()
-        repeat = False
-        n = 1
-        while self.peek() == char:
-            n += 1
-            self.next()
-        if self.peek() == u"\u0332": # combining low line (underline)
-            repeat = True
-            n -= 1 # last char was underlined; don't count it
-            self.next() # discard underline
+
+        def snarf():
+            n = 0
+            repeat = False
+            while self.peek() == char:
+                n += 1
+                self.next()
+            if self.peek() == u"\u0332": # combining low line (underline)
+                repeat = True
+                n -= 1 # last char was underlined; don't count it
+                self.next() # discard underline
+            return n, repeat
+        n, repeat = snarf()
+        n += 1 # for the char that sparked this call
+        if self.peek() in (",", "."):
+            separator = self.next()
+            frac, frac_repeat = snarf()
+        else:
+            separator = None
+            frac, frac_repeat = 0, False
         return Element(self.syntax.digits[char],
-                       n, None if repeat else n, signed)
+                       (n, None if repeat else n),
+                       (frac, None if frac_repeat else frac),
+                       separator, signed)
 
     @property
     def syntax(self):
