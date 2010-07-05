@@ -17,6 +17,8 @@ class InvalidTimeUnit(Exception):
         return "invalid %s %r" % (type(self.unit).__name__.lower(), self.value)
 
 class TimeUnit(object):
+    """A unit of time."""
+
     range = (0,)
 
     def __init__(self, value, ordinal=True, signed=None,
@@ -65,7 +67,7 @@ class TimeUnit(object):
         u"""Naïve subtraction (does not deal with underflow)."""
         if isinstance(other, type(self)):
             return type(self)(self.value - other.value)
-        elif isinstance(other, int):
+        elif isinstance(other, (int, Decimal)):
             return type(self)(self.value - other)
         else:
             return NotImplemented
@@ -73,7 +75,7 @@ class TimeUnit(object):
     def __eq__(self, other):
         if isinstance(other, type(self)):
             return self.value == other.value
-        elif isinstance(other, int):
+        elif isinstance(other, (int, Decimal)):
             return self.value == other
         else:
             return NotImplemented
@@ -81,7 +83,7 @@ class TimeUnit(object):
     def __ne__(self, other):
         if isinstance(other, type(self)):
             return self.value != other.value
-        elif isinstance(other, int):
+        elif isinstance(other, (int, Decimal)):
             return self.value != other
         else:
             return NotImplemented
@@ -89,7 +91,7 @@ class TimeUnit(object):
     def __lt__(self, other):
         if isinstance(other, type(self)):
             return self.value < other.value
-        elif isinstance(other, int):
+        elif isinstance(other, (int, Decimal)):
             return self.value < other
         else:
             return NotImplemented
