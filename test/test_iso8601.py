@@ -91,8 +91,8 @@ class TestCalendarDate(RepresentationTestCase):
     def test_complete(self):
         """4.1.2.2"""
         date = CalendarDate(1985, 4, 12)
-        self.assertFormat("YYYYMMDD", "19850412", date) # basic format
-        self.assertFormat("YYYY-MM-DD", "1985-04-12", date) # extended format
+        self.assertFormat("YYYYMMDD", "19850412", date) # basic
+        self.assertFormat("YYYY-MM-DD", "1985-04-12", date) # extended
 
     def test_reduced(self):
         """4.1.2.3"""
@@ -104,13 +104,13 @@ class TestCalendarDate(RepresentationTestCase):
         """4.1.2.4"""
         # a) A specific day
         date = CalendarDate(1985, 4, 12)
-        self.assertFormat(u"±YYYYYYMMDD", u"+0019850412", date) # basic format
+        self.assertFormat(u"±YYYYYYMMDD", u"+0019850412", date) # basic
         self.assertFormat(u"±YYYYYY‐MM‐DD", u"+001985‐04‐12", date) # extended
 
         # b) A specific month
         month = CalendarDate(1985, 4)
-        self.assertFormat(u"±YYYYYYMM", u"+00198504", month) # basic format
-        self.assertFormat(u"±YYYYYY‐MM", u"+001985‐04", month) # extended format
+        self.assertFormat(u"±YYYYYYMM", u"+00198504", month) # basic
+        self.assertFormat(u"±YYYYYY‐MM", u"+001985‐04", month) # extended
 
         # c) A specific year
         self.assertFormat(u"±YYYYYY", u"+001985", Year(1985))
@@ -124,14 +124,14 @@ class TestOrdinalDate(RepresentationTestCase):
     def test_complete(self):
         """4.1.3.2"""
         date = OrdinalDate(1985, 102)
-        self.assertFormat(u"YYYYDDD", u"1985102", date) # basic format
-        self.assertFormat(u"YYYY‐DDD", u"1985‐102", date) # extended format
+        self.assertFormat(u"YYYYDDD", u"1985102", date) # basic
+        self.assertFormat(u"YYYY‐DDD", u"1985‐102", date) # extended
 
     def test_expanded(self):
         """4.1.3.3"""
         date = OrdinalDate(1985, 102)
-        self.assertFormat(u"±YYYYYYDDD", u"+001985102", date) # basic format
-        self.assertFormat(u"±YYYYYY‐DDD", u"+001985‐102", date) # extended format
+        self.assertFormat(u"±YYYYYYDDD", u"+001985102", date) # basic
+        self.assertFormat(u"±YYYYYY‐DDD", u"+001985‐102", date) # extended
 
 class TestWeekDate(RepresentationTestCase):
     """Section 4.1.4."""
@@ -139,27 +139,27 @@ class TestWeekDate(RepresentationTestCase):
     def test_complete(self):
         """4.1.4.2"""
         date = WeekDate(1985, 15, 5)
-        self.assertFormat(u"YYYYWwwD", "1985W155", date) # basic format
-        self.assertFormat(u"YYYY‐Www‐D", u"1985‐W15‐5", date) # extended format
+        self.assertFormat(u"YYYYWwwD", "1985W155", date) # basic
+        self.assertFormat(u"YYYY‐Www‐D", u"1985‐W15‐5", date) # extended
 
     def test_reduced(self):
         """4.1.4.3"""
         # A specific week
         week = WeekDate(1985, 15)
-        self.assertFormat(u"YYYYWww", "1985W15", week) # basic format
-        self.assertFormat(u"YYYY‐Www", u"1985‐W15", week) # extended format
+        self.assertFormat(u"YYYYWww", "1985W15", week) # basic
+        self.assertFormat(u"YYYY‐Www", u"1985‐W15", week) # extended
 
     def test_expanded(self):
         """4.1.4.4"""
         # a) A specific day
         date = CalendarDate(1985, 4, 12)
-        self.assertFormat(u"±YYYYYYMMDD", u"+0019850412", date) # basic format
+        self.assertFormat(u"±YYYYYYMMDD", u"+0019850412", date) # basic
         self.assertFormat(u"±YYYYYY‐MM‐DD", u"+001985‐04‐12", date) # extended
 
         # b) A specific month
         month = CalendarDate(1985, 4)
-        self.assertFormat(u"±YYYYYYMM", u"+00198504", month) # basic format
-        self.assertFormat(u"±YYYYYY‐MM", u"+001985‐04", month) # extended format
+        self.assertFormat(u"±YYYYYYMM", u"+00198504", month) # basic
+        self.assertFormat(u"±YYYYYY‐MM", u"+001985‐04", month) # extended
 
         # c) A specific year
         self.assertFormat(u"±YYYYYY", u"+001985", Year(1985))
@@ -173,15 +173,15 @@ class TestLocalTime(RepresentationTestCase):
     def test_complete(self):
         """4.2.2.2"""
         time = Time(23, 20, 50)
-        self.assertFormat("hhmmss", "232050", time) # basic format
-        self.assertFormat("hh:mm:ss", "23:20:50", time) # basic format
+        self.assertFormat("hhmmss", "232050", time) # basic
+        self.assertFormat("hh:mm:ss", "23:20:50", time) # extended
 
     def test_reduced(self):
         """4.2.2.3"""
         # a) A specific hour and minute
         time = Time(23, 20)
-        self.assertFormat("hhmm", "2320", time) # basic format
-        self.assertFormat("hh:mm", "23:20", time) # basic format
+        self.assertFormat("hhmm", "2320", time) # basic
+        self.assertFormat("hh:mm", "23:20", time) # extended
 
         # b) A specific hour
         self.assertFormat("hh", "23", Hour(23))
@@ -191,13 +191,13 @@ class TestLocalTime(RepresentationTestCase):
         # a) A specific hour, minute, and second and a decimal fraction of
         # the second
         time = Time(23, 20, Decimal("50.5"))
-        self.assertFormat(u"hhmmss,ss̲", "232050,5", time) # basic format
+        self.assertFormat(u"hhmmss,ss̲", "232050,5", time) # basic
         self.assertFormat(u"hh:mm:ss,ss̲", "23:20:50,5", time) # extended
 
         # b) A specific hour and minute and a decimal fraction of the minute
         time = Time(23, Decimal("20.8"))
-        self.assertFormat(u"hhmm,mm̲", "2320,8", time) # basic format
-        self.assertFormat(u"hh:mm,mm̲", "23:20,8", time) # extended format
+        self.assertFormat(u"hhmm,mm̲", "2320,8", time) # basic
+        self.assertFormat(u"hh:mm,mm̲", "23:20,8", time) # extended
 
         # c) A specific hour and a decimal fraction of the hour
         self.assertFormat(u"hh,hh̲", "23,3", Hour(Decimal("23.3")))
