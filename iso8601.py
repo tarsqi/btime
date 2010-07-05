@@ -14,7 +14,7 @@ class InvalidTimeUnit(Exception):
         self.value = value
 
     def __str__(self):
-        return "invalid %s %s" % (type(self.unit).__name__.lower(), self.value)
+        return "invalid %s %r" % (type(self.unit).__name__.lower(), self.value)
 
 class TimeUnit(object):
     range = (0,)
@@ -101,7 +101,7 @@ class TimeUnit(object):
         return str(self.value)
 
     def __repr__(self):
-        return "%s(%s)" % (type(self).__name__, self.value)
+        return "%s(%r)" % (type(self).__name__, self.value)
 
 unit = TimeUnit(None)
 
@@ -254,7 +254,7 @@ class TimeRep(object):
                 attr = getattr(elt, name, None)
                 if attr:
                     return attr
-        raise AttributeError("'%s' representation has no element '%s'" % \
+        raise AttributeError("%r representation has no element %r" % \
                                  (type(self).__name__, name))
 
     def __getitem__(self, key):
@@ -573,7 +573,8 @@ class Element(FormatOp):
 
     def __repr__(self):
         return "%s(%s, (%s, %s), (%s, %s), %r, %r)" \
-            % (type(self).__name__, self.cls.__name__,
+            % (type(self).__name__,
+               self.cls.__name__,
                self.min, self.max,
                self.frac_min, self.frac_max,
                self.separator, self.signed)
@@ -705,7 +706,7 @@ class Format(object):
         for i in range(1, len(self.stack)):
             merged = obj.merge(self.stack[i])
             if not merged:
-                raise StopFormat("can't merge elements: %s, %s" \
+                raise StopFormat("can't merge elements %r, %r" \
                                      % (obj, self.stack[i]))
             obj = merged
         return obj
