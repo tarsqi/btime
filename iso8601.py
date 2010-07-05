@@ -358,6 +358,13 @@ class DateTime(Date, Time):
             return super(DateTime, self).merge(other, destructive)
 
 class TimeDuration(TimeRep):
+    """Represents a duration consisting of hours, minutes, and seconds.
+
+    This class exists primarily because the [M] designator in a duration
+    representation is ambiguous; before a [T] it means months, but after
+    it means minutes. In order to disambiguate, [T] switches the syntax
+    class to this class."""
+
     digits = {"n": TimeUnit}
     designators = {"H": Hours, "M": Minutes, "S": Seconds}
 
@@ -419,7 +426,20 @@ class RecurringTimeInterval(TimeInterval):
 # class doesn't exist at that time.
 RecurringTimeInterval.designators["R"] = RecurringTimeInterval
 
+# We allow the user to specify the format representations used for the
+# interchange of dates and times. Usually, these will be one of the format
+# representations defined in ISO 8601; e.g., [YYYYMMDD] for a calendar date
+# or [YYYY-MM-DDThh:mm:ss] for calendar date and local time. Some deviation
+# from the standard format representations is permitted, but only to a point.
+# Format representations can be used for both reading and formatting (printing)
+# of date and time representations.
+
+# Format representations are parsed by the FormatReprParser class into a list
+# of operations for a simple virtual machine implemented by the Format class.
+# These operations are called format ops, or fops.
+
 class StopFormat(Exception):
+    """Halt the execution of a format machine."""
     pass
 
 class FormatOp(object):
@@ -431,12 +451,14 @@ class FormatOp(object):
     def read(self, m):
         """Read zero or more characters from the input, and possibly push a
         new element onto the stack. Returns True if the top elements of the
-        stack should be merged, or False otherwise."""
+        stack should be merged, and False otherwise."""
         raise StopFormat
 
 class Literal(FormatOp):
+    """Produce or consume a literal string."""
+
     def __init__(self, lit):
-        self.lit = lit.upper()
+        self.lit = lit.upper() # see section 3.4.1, note 1
 
     def format(self, m):
         m.stack.append(self.lit)
@@ -447,7 +469,7 @@ class Literal(FormatOp):
             m.i += len(self.lit)
             return False
         else:
-            raise StopFormat("expected [%s]; got [%s]" % \
+            raise StopFormat("expected [%s], got [%s]" % \
                                  (self.lit, m.input[m.i:m.i+len(self.lit)]))
 
     def __eq__(self, other):
@@ -463,6 +485,9 @@ class Separator(Literal):
         self.hard = hard
 
     def format(self, m):
+        # We push the literal onto a separate stack so that we don't output
+        # a separator before elements that have been elided due to accuracy
+        # reduction. The next fop will pick it up if it needs to.
         m.separators.append(self.lit)
         return True
 
@@ -477,6 +502,9 @@ class Separator(Literal):
             return False
 
 class Designator(Literal):
+    """A designator indicates a change in syntax in the format representation;
+     e.g., from date to time."""
+
     def __init__(self, lit, cls):
         super(Designator, self).__init__(lit)
         self.cls = cls
@@ -495,6 +523,8 @@ class Designator(Literal):
         return super(Designator, self).__eq__(other) and self.cls is other.cls
 
 class Coerce(Designator):
+    """A postfix designator, like the ones used in duration representations."""
+
     def read(self, m):
         """Coerce the element on the top of the stack to a different type."""
         Literal.read(self, m)
@@ -502,6 +532,8 @@ class Coerce(Designator):
         return True
 
 class UTCDesignator(Designator):
+    """A special-purpose designator representing UTC."""
+
     def __init__(self):
         super(UTCDesignator, self).__init__("Z", UTCOffset)
 
@@ -513,6 +545,9 @@ class UTCDesignator(Designator):
 Z = UTCDesignator()
 
 class Element(FormatOp):
+    """A fixed-width representation of a unit of time, possibly with sign
+    and decimal fraction components."""
+
     def __init__(self, cls, digits, frac=(0,0), separator=",", signed=False):
         assert issubclass(cls, TimeUnit)
         self.cls = cls
