@@ -156,6 +156,8 @@ class Second(TimeUnit):
 
 class Cardinal(TimeUnit):
     def __init__(self, value, signed=False):
+        if value is not None and value < 0:
+            raise ValueError("invalid cardinal %r" % value)
         super(Cardinal, self).__init__(value, signed)
 
 class Years(Cardinal, Year):
