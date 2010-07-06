@@ -726,7 +726,7 @@ class Format(object):
                     break
         return "".join(self.stack)
 
-    def read(self, string, debug=False):
+    def read(self, string):
         self.input = string.upper()
         self.i = 0
         self.stack = []
@@ -737,8 +737,6 @@ class Format(object):
                 merged = self.stack[-2].merge(self.stack[-1])
                 if merged:
                     self.stack[-2:] = [merged]
-            if debug:
-                print self.stack
 
         # Now we merge bottom-up. These merges must all succeed.
         obj = self.stack[0]
