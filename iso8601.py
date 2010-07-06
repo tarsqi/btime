@@ -246,9 +246,6 @@ class TimeRep(object):
                     merged.elements[i] = other
                     return merged
 
-    def nmerge(self, other):
-        return self.merge(other, True)
-
     def __getattr__(self, name):
         for elt in self.elements:
             if any(c.__name__.lower() == name for c in type(elt).__mro__):
