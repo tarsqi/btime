@@ -461,10 +461,10 @@ RecurringTimeInterval.designators["R"] = RecurringTimeInterval
 # We allow the user to specify the format representations used for the
 # interchange of dates and times. Usually, these will be one of the format
 # representations defined in ISO 8601; e.g., [YYYYMMDD] for a calendar date
-# or [YYYY-MM-DDThh:mm:ss] for calendar date and local time. Some deviation
-# from the standard format representations is permitted, but only to a point.
-# Format representations can be used for both reading and formatting (printing)
-# of date and time representations.
+# or [YYYYMMDDThhmmss] for calendar date and local time. Some deviation
+# from the standard format representations is permitted, but only to a
+# point. Format representations can be used for both reading and formatting
+# (printing) of date and time representations.
 
 # Format representations are parsed by the FormatReprParser class into a list
 # of operations for a simple virtual machine implemented by the Format class.
