@@ -79,6 +79,17 @@ class TestElementFormat(TestCase):
         self.assertElementFormat("12,34", d, (2, 2), (2, 2))
         self.assertElementFormat("12,3456", d, (2, 2), (2, None))
 
+class TestReducedAccuracy(TestCase):
+    def test_reduction(self):
+        """Elide higher-order components"""
+        self.assertEqual(Format("hhmm").format(Time(23, 20, 50)), "2320")
+        self.assertEqual(Format("YYYY").format(CalendarDate(1985, 4)), "1985")
+
+    def test_missing(self):
+        """Quitely skip missing components"""
+        self.assertEqual(Format("hhmm").format(Time(23)), "23")
+        self.assertEqual(Format("hh:mm").format(Time(23)), "23")
+
 class RepresentationTestCase(TestCase):
     def assertFormat(self, format_repr, representation, obj, syntax=None):
         format = Format(format_repr, syntax) if syntax else Format(format_repr)
@@ -414,6 +425,7 @@ def suite():
     return TestSuite([TestLoader().loadTestsFromTestCase(cls) \
                           for cls in (TestFormatReprParser,
                                       TestElementFormat,
+                                      TestReducedAccuracy,
                                       TestCalendarDate,
                                       TestOrdinalDate,
                                       TestWeekDate,

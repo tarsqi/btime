@@ -560,7 +560,12 @@ class Element(FormatOp):
                                        if self.frac_min else ""))
 
     def format(self, m):
-        elt = m.input.next()
+        try:
+            elt = m.input.next()
+        except StopIteration:
+            if m.separators:
+                m.separators.pop()
+            return True
         if elt and issubclass(type(elt), self.cls):
             s = m.separators.pop() if m.separators else ""
             if self.signed:
@@ -721,6 +726,7 @@ class Format(object):
                     op = ops.next()
                 except StopIteration:
                     break
+        assert not self.separators, "left-over separators: %s" % self.separators
         return "".join(self.stack)
 
     def read(self, string):
