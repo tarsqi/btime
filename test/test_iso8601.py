@@ -338,6 +338,31 @@ class TestDateTime(RepresentationTestCase):
 class TestTimeInterval(RepresentationTestCase):
     """Section 4.4."""
 
+    def test_duration(self):
+        """4.4.3.2"""
+        def format(format_repr, timerep):
+            return Format(format_repr).format(timerep)
+
+        # a) The lowest order components may be omitted.
+        self.assertEqual(format(u"Pnn̲Ynn̲Mnn̲DTnn̲Hnn̲M", # omitted components
+                                Duration(1, 2, 15, 12, 30, 0)),
+                         u"P1Y2M15DT12H30M")
+        self.assertEqual(format(u"Pnn̲Ynn̲Mnn̲DTnn̲Hnn̲Mnn̲S", # missing components
+                                Duration(1, 2, 15, 12, 30)),
+                         u"P1Y2M15DT12H30M")
+
+        # b) The lowest order components may have a decimal fraction.
+        self.assertEqual(format(u"Pnn̲Ynn̲Mnn̲DTnn̲Hnn̲Mnn̲,n̲S",
+                                Duration(1, 2, 15, 12, 30, Decimal("15.5"))),
+                         u"P1Y2M15DT12H30M15,5S")
+
+        # c) Designators may be absent for zeros; we don't currently do this.
+
+        # d) The designator [T] shall be absent if all of the time
+        # components are absent.
+        self.assertEqual(format(u"Pnn̲Ynn̲Mnn̲DTnn̲Hnn̲Mnn̲S", Duration(1, 2, 15)),
+                         "P1Y2M15D")
+
     def test_start_and_end(self):
         """4.4.4.1"""
         interval = TimeInterval(DateTime(CalendarDate(1985, 4, 12),
