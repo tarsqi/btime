@@ -222,9 +222,9 @@ class TestLocalTime(RepresentationTestCase):
 class TestUTC(RepresentationTestCase):
     def test(self):
         """4.2.4"""
-        hhmmss = Time(23, 20, 30, UTC)
-        hhmm = Time(23, 20, None, UTC)
-        hh = Time(23, None, None, UTC)
+        hhmmss = Time(23, 20, 30, utc)
+        hhmm = Time(23, 20, None, utc)
+        hh = Time(23, None, None, utc)
 
         # Basic format
         self.assertFormat("hhmmssZ", "232030Z", hhmmss)
@@ -280,7 +280,7 @@ class TestDateTime(RepresentationTestCase):
                           DateTime(date, time))
         self.assertFormat(u"YYYYMMDDThhmmssZ",
                           u"19850412T101530Z",
-                          DateTime(date, time.merge(UTC)))
+                          DateTime(date, time.merge(utc)))
         self.assertFormat(u"YYYYMMDDThhmmss±hhmm",
                           u"19850412T101530+0400",
                           DateTime(date, time.merge(offset_hhmm)))
@@ -294,7 +294,7 @@ class TestDateTime(RepresentationTestCase):
                           DateTime(date, time))
         self.assertFormat(u"YYYY‐MM‐DDThh:mm:ssZ",
                           u"1985‐04‐12T10:15:30Z",
-                          DateTime(date, time.merge(UTC)))
+                          DateTime(date, time.merge(utc)))
         self.assertFormat(u"YYYY‐MM‐DDThh:mm:ss±hh:mm",
                           u"1985‐04‐12T10:15:30+04:00",
                           DateTime(date, time.merge(offset_hhmm)))
@@ -322,10 +322,10 @@ class TestDateTime(RepresentationTestCase):
         # b) Ordinal date and UTC of day
         self.assertFormat(u"YYYYDDDThhmmZ", # basic format
                           u"1985102T1015Z",
-                          DateTime(orddate, time.merge(UTC)))
+                          DateTime(orddate, time.merge(utc)))
         self.assertFormat(u"YYYY‐DDDThh:mmZ", # extended format
                           u"1985‐102T10:15Z",
-                          DateTime(orddate, time.merge(UTC)))
+                          DateTime(orddate, time.merge(utc)))
 
         # c) Week date and local time and the difference from UTC
         self.assertFormat(u"YYYYWwwDThhmm±hhmm", # basic format
@@ -446,6 +446,75 @@ class TestRucurringTimeInterval(RepresentationTestCase):
                           u"R12/P1Y2M15DT12H30M0S/1985‐04‐12T23:20:50",
                           RecurringTimeInterval(12, duration, april_4))
 
+class TestStandardFormats(TestCase):
+    def assertString(self, timerep, string):
+        self.assertEqual(str(timerep), string)
+
+    def test_calendar_date(self):
+        """Calendar date format"""
+        self.assertString(CalendarDate(1985, 4, 12), "1985-04-12")
+
+    def test_ordinal_date(self):
+        """Ordinal date format"""
+        self.assertString(OrdinalDate(1985, 102), "1985-102")
+
+    def test_week_date(self):
+        """Week date format"""
+        self.assertString(WeekDate(1985, 15, 5), "1985-W15-5")
+
+    def test_utc_offset(self):
+        """UTC and difference from UTC"""
+        self.assertString(UTCOffset(0, 0), "+00:00")
+        self.assertString(UTCOffset(-4, 0), "-04:00")
+        self.assertString(UTCOffset(1), "+01")
+        self.assertString(utc, "Z")
+
+    def test_time(self):
+        """Time format"""
+        self.assertString(Time(23, 20, 50), "23:20:50")
+        self.assertString(Time(23, 20, 50, utc), "23:20:50Z")
+        self.assertString(Time(23, 20, 50, UTCOffset(-4, 0)), "23:20:50-04:00")
+
+    def test_date_time(self):
+        """Date and time format"""
+        time = Time(23, 20, 50)
+        self.assertString(DateTime(CalendarDate(1985, 4, 12), time),
+                          "1985-04-12T23:20:50")
+        self.assertString(DateTime(OrdinalDate(1985, 102), time),
+                          "1985-102T23:20:50")
+        self.assertString(DateTime(WeekDate(1985, 15, 5), time),
+                          "1985-W15-5T23:20:50")
+
+    def test_time_interval(self):
+        """Time interval format"""
+        april_4 = DateTime(CalendarDate(1985, 4, 12), Time(23, 20, 50))
+        june_25 = DateTime(CalendarDate(1985, 6, 25), Time(10, 30, 00))
+        duration = Duration(1, 2, 15, 12, 30, 0)
+
+        self.assertString(TimeInterval(duration),
+                          "P1Y2M15DT12H30M0S")
+        self.assertString(TimeInterval(april_4, duration),
+                          "1985-04-12T23:20:50/P1Y2M15DT12H30M0S")
+        self.assertString(TimeInterval(duration, april_4),
+                          "P1Y2M15DT12H30M0S/1985-04-12T23:20:50")
+        self.assertString(TimeInterval(april_4, june_25),
+                          "1985-04-12T23:20:50/1985-06-25T10:30:00")
+
+    def test_recurring_time_interval(self):
+        """Recurring time interval format"""
+        april_4 = DateTime(CalendarDate(1985, 4, 12), Time(23, 20, 50))
+        june_25 = DateTime(CalendarDate(1985, 6, 25), Time(10, 30, 00))
+        duration = Duration(1, 2, 15, 12, 30, 0)
+
+        self.assertString(RecurringTimeInterval(12, duration),
+                          "R12/P1Y2M15DT12H30M0S")
+        self.assertString(RecurringTimeInterval(12, april_4, duration),
+                          "R12/1985-04-12T23:20:50/P1Y2M15DT12H30M0S")
+        self.assertString(RecurringTimeInterval(12, duration, april_4),
+                          "R12/P1Y2M15DT12H30M0S/1985-04-12T23:20:50")
+        self.assertString(RecurringTimeInterval(12, april_4, june_25),
+                          "R12/1985-04-12T23:20:50/1985-06-25T10:30:00")
+
 def suite():
     return TestSuite([TestLoader().loadTestsFromTestCase(cls) \
                           for cls in (TestFormatReprParser,
@@ -459,7 +528,8 @@ def suite():
                                       TestLocalTimeAndUTC,
                                       TestDateTime,
                                       TestTimeInterval,
-                                      TestRucurringTimeInterval)])
+                                      TestRucurringTimeInterval,
+                                      TestStandardFormats)])
 
 def run(runner=TextTestRunner, **args):
     return runner(**args).run(suite())

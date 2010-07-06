@@ -273,6 +273,14 @@ class TimeRep(object):
     def __eq__(self, other):
         return all(map(eq, self, other))
 
+    def __str__(self):
+        if hasattr(self, "stdformat"):
+            # Lazily build the format object and cache it in the class.
+            self.__class__.stdformat = ensure_class(self.stdformat, Format)
+            return self.stdformat.format(self)
+        else:
+            return super(TimeRep, self).__str__()
+
 class TimePoint(TimeRep):
     pass
 
@@ -290,6 +298,7 @@ class Date(TimePoint):
 
 class CalendarDate(Date):
     digits = {"Y": Year, "M": Month, "D": DayOfMonth}
+    stdformat = "YYYY-MM-DD"
 
     @units(Year, Month, Day)
     def __init__(self, *args):
@@ -298,6 +307,7 @@ class CalendarDate(Date):
 
 class OrdinalDate(Date):
     digits = {"Y": Year, "D": DayOfYear}
+    stdformat = "YYYY-DDD"
 
     @units(Year, Day)
     def __init__(self, *args):
@@ -306,6 +316,7 @@ class OrdinalDate(Date):
 
 class WeekDate(Date):
     digits = {"Y": Year, "w": Week, "D": DayOfWeek}
+    stdformat = "YYYY-Www-D"
 
     @units(Year, Week, Day)
     def __init__(self, *args):
@@ -314,18 +325,26 @@ class WeekDate(Date):
 
 class UTCOffset(TimePoint):
     digits = {"h": Hour, "m": Minute}
+    stdformat = u"±hh:mm"
 
     @units(Hour, Minute)
     def __init__(self, hour=0, minute=None):
         self.check_accuracy(hour, minute)
         super(UTCOffset, self).__init__(hour, minute)
 
-UTC = UTCOffset(0)
+class UTC(UTCOffset):
+    stdformat = "Z"
+
+    def __init__(self):
+        super(UTC, self).__init__(0, 0)
+
+utc = UTC()
 
 class Time(TimePoint):
     digits = {"h": Hour, "m": Minute, "s": Second}
-    designators = {"T": None, "Z": UTC}
+    designators = {"T": None, "Z": utc}
     separators = {":": False}
+    stdformat = u"hh:mm:ss"
 
     @units(Hour, Minute, Second, UTCOffset)
     def __init__(self, hour=None, minute=None, second=None, offset=None):
@@ -337,6 +356,10 @@ class Time(TimePoint):
             return Time(self.hour, self.minute, self.second, UTCOffset(other))
         else:
             return super(Time, self).merge(other, destructive)
+
+    def __str__(self):
+        return (super(Time, self).__str__() +
+                str(self.utcoffset) if self.utcoffset else "")
 
 class DateTime(Date, Time):
     designators = {"T": Time}
@@ -353,6 +376,9 @@ class DateTime(Date, Time):
             return TimeInterval(self, other)
         else:
             return super(DateTime, self).merge(other, destructive)
+
+    def __str__(self):
+        return "T".join(map(str, self.elements))
 
 class TimeDuration(TimeRep):
     """Represents a duration consisting of hours, minutes, and seconds.
@@ -374,6 +400,7 @@ class Duration(TimeRep):
     digits = {"n": TimeUnit}
     designators = {"W": Weeks, "Y": Years, "M": Months, "D": Days,
                    "T": TimeDuration}
+    stdformat = u"Pnn̲Ynn̲Mnn̲DTnn̲Hnn̲Mnn̲S"
 
     @units(Years, Months, Days, Hours, Minutes, Seconds)
     def __init__(self, *args):
@@ -392,6 +419,8 @@ class Duration(TimeRep):
             return super(Duration, self).merge(other, destructive)
 
 class WeeksDuration(Duration):
+    stdformat = u"Pnn̲W"
+
     @units(Weeks)
     def __init__(self, weeks=None):
         super(Duration, self).__init__(weeks)
@@ -403,6 +432,9 @@ class TimeInterval(DateTime):
     def __init__(self, *args):
         assert len(args) <= 2, "too many end-points for a time interval"
         TimeRep.__init__(self, *args)
+
+    def __str__(self):
+        return "/".join(map(str, self.elements))
 
 class RecurringTimeInterval(TimeInterval):
     digits = {"n": Recurrences}
@@ -418,6 +450,9 @@ class RecurringTimeInterval(TimeInterval):
             return RecurringTimeInterval(*(self.elements + [other]))
         else:
             return super(RecurringTimeInterval, self).merge(other, destructive)
+
+    def __str__(self):
+        return "R" + super(RecurringTimeInterval, self).__str__()
 
 # We can't do this assignment in the class definition above, because the
 # class doesn't exist at that time.
@@ -440,10 +475,12 @@ class StopFormat(Exception):
     pass
 
 class FormatOp(object):
-    def format(self, m):
+    def format(self, m, elt):
         """Format the next element in the input and push the result onto the
-        stack. Returns False if the element can not be formatted."""
-        return False
+        stack. Returns True if the operation succeeded and the element was
+        consumed, False if the element was not consumed, and None if the
+        operation could not be applied to the current element."""
+        return None
 
     def read(self, m):
         """Read zero or more characters from the input, and possibly push a
@@ -457,9 +494,9 @@ class Literal(FormatOp):
     def __init__(self, lit):
         self.lit = lit.upper() # see section 3.4.1, note 1
 
-    def format(self, m):
+    def format(self, m, elt):
         m.stack.append(self.lit)
-        return True
+        return False
 
     def read(self, m):
         if not self.lit or m.input.startswith(self.lit, m.i):
@@ -481,12 +518,12 @@ class Separator(Literal):
         super(Separator, self).__init__(lit)
         self.hard = hard
 
-    def format(self, m):
+    def format(self, m, elt):
         # We push the literal onto a separate stack so that we don't output
         # a separator before elements that have been elided due to accuracy
         # reduction. The next fop will pick it up if it needs to.
         m.separators.append(self.lit)
-        return True
+        return False
 
     def read(self, m):
         super(Separator, self).read(m)
@@ -506,9 +543,11 @@ class Designator(Literal):
         super(Designator, self).__init__(lit)
         self.cls = cls
 
-    def format(self, m):
-        m.stack.append(m.separators.pop() if m.separators else "")
-        return super(Designator, self).format(m)
+    def format(self, m, elt):
+        if m.separators:
+            m.stack.append(m.separators.pop())
+        if elt:
+            return super(Designator, self).format(m, elt)
 
     def read(self, m):
         super(Designator, self).read(m)
@@ -522,6 +561,11 @@ class Designator(Literal):
 class Coerce(Designator):
     """A postfix designator, like the ones used in duration representations."""
 
+    def format(self, m, elt):
+        if m.separators:
+            m.stack.append(m.separators.pop())
+        return Literal.format(self, m, elt)
+
     def read(self, m):
         """Coerce the element on the top of the stack to a different type."""
         Literal.read(self, m)
@@ -534,9 +578,12 @@ class UTCDesignator(Designator):
     def __init__(self):
         super(UTCDesignator, self).__init__("Z", UTCOffset)
 
+    def format(self, m, elt):
+        return Literal.format(self, m, elt)
+
     def read(self, m):
-        super(Designator, self).read(m)
-        m.stack.append(UTC)
+        super(UTCDesignator, self).read(m)
+        m.stack.append(utc)
         return True
 
 Z = UTCDesignator()
@@ -559,13 +606,7 @@ class Element(FormatOp):
                                         (self.frac_min, self.frac_max or "")) \
                                        if self.frac_min else ""))
 
-    def format(self, m):
-        try:
-            elt = m.input.next()
-        except StopIteration:
-            if m.separators:
-                m.separators.pop()
-            return True
+    def format(self, m, elt):
         if elt and issubclass(type(elt), self.cls):
             s = m.separators.pop() if m.separators else ""
             if self.signed:
@@ -645,7 +686,7 @@ class FormatReprParser(object):
     def designator(self, char):
         if char in self.syntax.designators:
             designate = self.syntax.designators[char]
-            if designate is UTC:
+            if designate is utc:
                 # Special case: UTC designator.
                 return Z
             elif designate and issubclass(designate, TimeUnit):
@@ -714,19 +755,36 @@ class Format(object):
         self.separators = []
         self.stack = []
         if isinstance(timerep, TimeRep):
-            self.input = iter(timerep)
+            elts = iter(timerep)
         elif isinstance(timerep, TimeUnit):
-            self.input = iter([timerep])
+            elts = iter([timerep])
+        else:
+            raise TypeError("can't format %r" % timerep)
+        elt = elts.next()
         ops = iter(self.ops); op = ops.next()
         while True:
-            # Fops can decline to format an element; this is used to elide
-            # lower-order components.
-            if op.format(self):
+            result = op.format(self, elt)
+            if result is not None:
+                # The fop succeeded in formatting the element; fetch the
+                # next one.
                 try:
                     op = ops.next()
                 except StopIteration:
+                    # If we're out of fops, we're done.
                     break
-        assert not self.separators, "left-over separators: %s" % self.separators
+            if result is not False:
+                # The fop consumed the element or declined to format it.
+                # Either way, fetch a new element if there is one.
+                if elts:
+                    try:
+                        elt = elts.next()
+                    except StopIteration:
+                        # If we run out of elements, we'll give the next
+                        # fop a chance to run anyway: it might be a postfix
+                        # designator, which doesn't need an element.
+                        elt = elts = None
+                else:
+                    break
         return "".join(self.stack)
 
     def read(self, string):
