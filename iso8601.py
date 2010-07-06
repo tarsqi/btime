@@ -592,7 +592,8 @@ class Element(FormatOp):
     """A fixed-width representation of a unit of time, possibly with sign
     and decimal fraction components."""
 
-    def __init__(self, cls, digits, frac=(0,0), separator=",", signed=False):
+    def __init__(self, cls, digits, frac=(None, None),
+                 separator=",", signed=False):
         assert issubclass(cls, TimeUnit)
         self.cls = cls
         self.min, self.max = digits
@@ -614,7 +615,7 @@ class Element(FormatOp):
             whole = abs(int(elt.value))
             frac = abs(elt.value) - whole
             s += ("%0*d" % (self.min, whole))[0:self.max]
-            if self.frac_min > 0:
+            if self.frac_min is not None:
                 s += self.separator
                 if frac and isinstance(frac, Decimal):
                     q = (Decimal(10) ** -self.frac_max) if self.frac_max \
@@ -723,16 +724,16 @@ class FormatReprParser(object):
                 n -= 1 # last char was underlined; don't count it
                 self.next() # discard underline
             return n, repeat
-        n, repeat = snarf()
-        n += 1 # for the char that sparked this call
+        digits, repeat = snarf()
+        digits += 1 # for the char that sparked this call
         if self.peek() in (",", "."):
             separator = self.next()
             frac, frac_repeat = snarf()
         else:
             separator = None
-            frac, frac_repeat = 0, False
+            frac, frac_repeat = None, False
         return Element(self.syntax.digits[char],
-                       (n, None if repeat else n),
+                       (digits, None if repeat else digits),
                        (frac, None if frac_repeat else frac),
                        separator, signed)
 

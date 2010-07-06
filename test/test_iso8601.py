@@ -33,6 +33,7 @@ class TestFormatReprParser(TestCase):
 
     def test_fractional_element(self):
         """Element with decimal fraction"""
+        self.assertFormatRepr(u"XX,X̲", Element(TimeUnit, (2, 2), (0, None)))
         self.assertFormatRepr(u"XX,XX̲", Element(TimeUnit, (2, 2), (1, None)))
         self.assertFormatRepr(u"XX.XX", Element(TimeUnit, (2, 2), (2, 2), "."))
 
