@@ -22,13 +22,13 @@ class TimeUnit(object):
     range = (0,)
 
     def __init__(self, value, ordinal=True, signed=None,
-                 pattern=re.compile(r"([+-])?([0-9]+)")):
+                 pattern=re.compile(r"([+-])?([0-9]+)(\.[0-9]+)?")):
         if isinstance(value, basestring):
             m = pattern.match(value)
             if not m:
                 raise InvalidTimeUnit(self, value)
             self.signed = m.group(1)
-            self.value = int((self.signed if self.signed else "") + m.group(2))
+            self.value = (Decimal if m.group(3) else int)(m.group(0))
         elif value is None or isinstance(value, (int, Decimal)):
             self.signed = signed
             self.value = value
