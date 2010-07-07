@@ -377,6 +377,13 @@ class Time(TimePoint):
     def __init__(self, hour=None, minute=None, second=None, offset=None):
         self.check_accuracy(hour, minute, second)
         super(Time, self).__init__(hour, minute, second, offset)
+        # These attribute assignments are purely for optimization purposes:
+        # they speed up a common merge case by bypassing the (expensive) calls
+        # to __getattr__.
+        self.hour = hour
+        self.minute = minute
+        self.second = second
+        self.utcoffset = offset
 
     def merge(self, other):
         if isinstance(other, Hour) and other.signed:
@@ -395,6 +402,9 @@ class DateTime(Date, Time):
     def __init__(self, date, time):
         self.check_accuracy(date, time)
         TimeRep.__init__(self, date, time)
+        # Purely an optimization; see note in Time.__init__, above.
+        self.date = date
+        self.time = time
 
     def merge(self, other):
         if isinstance(other, (Hour, Minute, Second, UTCOffset)):
