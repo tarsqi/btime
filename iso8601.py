@@ -295,6 +295,20 @@ class Date(TimePoint):
     separators = {u"-": False, # hyphen-minus (a.k.a. ASCII hyphen, U+002D)
                   u"‐": False} # hyphen (U+2010)
 
+    def __new__(cls, *args):
+        """Construct a new instance of an appropriate date class based on
+        the types of the arguments."""
+        if cls is Date:
+            if any(isinstance(arg, DayOfYear) for arg in args):
+                return super(Date, OrdinalDate).__new__(OrdinalDate, *args)
+            elif any(isinstance(arg, Week) for arg in args):
+                return super(Date, WeekDate).__new__(WeekDate, *args)
+            else:
+                return super(Date, CalendarDate).__new__(CalendarDate, *args)
+        else:
+            # Subclass constructor; don't bother groveling through the args.
+            return super(Date, cls).__new__(cls)
+
     def merge(self, other, destructive=False):
         if isinstance(other, Time):
             return DateTime(self, other)
