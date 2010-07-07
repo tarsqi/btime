@@ -51,7 +51,7 @@ class TimeUnit(object):
             minvalue, maxvalue = self.range
             return minvalue <= abs(self.value) <= maxvalue
 
-    def merge(self, other, destructive=False):
+    def merge(self, other):
         return self or other
 
     def __or__(self, other):
@@ -113,7 +113,7 @@ unit = TimeUnit(None)
 class Year(TimeUnit):
     range = (0, 9999)
 
-    def merge(self, other, destructive=False):
+    def merge(self, other):
         if isinstance(other, Month):
             return CalendarDate(self, other)
         elif isinstance(other, Week):
@@ -142,7 +142,7 @@ class DayOfWeek(Day):
 class Hour(TimeUnit):
     range = (0, 24)
 
-    def merge(self, other, destructive=False):
+    def merge(self, other):
         if isinstance(other, Minute):
             if self.signed:
                 return UTCOffset(self, other)
@@ -164,7 +164,7 @@ class Cardinal(TimeUnit):
         super(Cardinal, self).__init__(value, signed)
 
 class Years(Cardinal, Year):
-    def merge(self, other, destructive=False):
+    def merge(self, other):
         if isinstance(other, Months):
             return Duration(self, other)
 
@@ -178,7 +178,7 @@ class Days(Cardinal, Day):
     pass
 
 class Hours(Cardinal, Hour):
-    def merge(self, other, destructive=False):
+    def merge(self, other):
         if isinstance(other, Minutes):
             return TimeDuration(self, other)
 
@@ -242,9 +242,9 @@ class TimeRep(object):
         obj.elements = self.elements[:]
         return obj
 
-    def merge(self, other, destructive=False):
+    def merge(self, other):
         if isinstance(other, type(self)):
-            merged = self if destructive else self.copy()
+            merged = self.copy()
             for i, elt in enumerate(merged.elements):
                 merged.elements[i] = merged.elements[i] if elt \
                                                         else other.elements[i]
@@ -252,7 +252,7 @@ class TimeRep(object):
         else:
             for i, elt in enumerate(self.elements):
                 if isinstance(other, type(elt)):
-                    merged = self if destructive else self.copy()
+                    merged = self.copy()
                     merged.elements[i] = other
                     return merged
 
@@ -317,11 +317,11 @@ class Date(TimePoint):
             # Subclass constructor; don't bother groveling through the args.
             return super(Date, cls).__new__(cls)
 
-    def merge(self, other, destructive=False):
+    def merge(self, other):
         if isinstance(other, Time):
             return DateTime(self, other)
         else:
-            return super(Date, self).merge(other, destructive)
+            return super(Date, self).merge(other)
 
 class CalendarDate(Date):
     digits = {"Y": Year, "M": Month, "D": DayOfMonth}
@@ -378,11 +378,11 @@ class Time(TimePoint):
         self.check_accuracy(hour, minute, second)
         super(Time, self).__init__(hour, minute, second, offset)
 
-    def merge(self, other, destructive=False):
+    def merge(self, other):
         if isinstance(other, Hour) and other.signed:
             return Time(self.hour, self.minute, self.second, UTCOffset(other))
         else:
-            return super(Time, self).merge(other, destructive)
+            return super(Time, self).merge(other)
 
     def __str__(self):
         return (super(Time, self).__str__() +
@@ -396,13 +396,13 @@ class DateTime(Date, Time):
         self.check_accuracy(date, time)
         TimeRep.__init__(self, date, time)
 
-    def merge(self, other, destructive=False):
+    def merge(self, other):
         if isinstance(other, (Hour, Minute, Second, UTCOffset)):
             return DateTime(self.date, self.time.merge(other))
         elif isinstance(other, (DateTime, Duration)):
             return TimeInterval(self, other)
         else:
-            return super(DateTime, self).merge(other, destructive)
+            return super(DateTime, self).merge(other)
 
     def __str__(self):
         return "T".join(map(str, self.elements))
@@ -434,7 +434,7 @@ class Duration(TimeRep):
         self.check_accuracy(*args)
         super(Duration, self).__init__(*args)
 
-    def merge(self, other, destructive=False):
+    def merge(self, other):
         if isinstance(other, Weeks):
             return WeeksDuration(other) # weeks don't mix with other elements
         elif isinstance(other, TimeDuration):
@@ -443,7 +443,7 @@ class Duration(TimeRep):
         elif isinstance(other, DateTime):
             return TimeInterval(self, other)
         else:
-            return super(Duration, self).merge(other, destructive)
+            return super(Duration, self).merge(other)
 
 class WeeksDuration(Duration):
     stdformat = u"Pnn̲W"
@@ -472,11 +472,11 @@ class RecurringTimeInterval(TimeInterval):
         assert len(args) <= 3
         TimeRep.__init__(self, *args)
 
-    def merge(self, other, destructive=False):
+    def merge(self, other):
         if isinstance(other, (DateTime, Duration)):
             return RecurringTimeInterval(*(self.elements + [other]))
         else:
-            return super(RecurringTimeInterval, self).merge(other, destructive)
+            return super(RecurringTimeInterval, self).merge(other)
 
     def __str__(self):
         return "R" + super(RecurringTimeInterval, self).__str__()
@@ -823,14 +823,14 @@ class Format(object):
         n = len(self.input)
         while self.i < n:
             if ops.next().read(self) and len(self.stack) > 1:
-                merged = self.stack[-2].merge(self.stack[-1], True)
+                merged = self.stack[-2].merge(self.stack[-1])
                 if merged:
                     self.stack[-2:] = [merged]
 
         # Now we merge bottom-up. These merges must all succeed.
         obj = self.stack[0]
         for i in range(1, len(self.stack)):
-            merged = obj.merge(self.stack[i], True)
+            merged = obj.merge(self.stack[i])
             if not merged:
                 raise StopFormat("can't merge elements %r, %r" \
                                      % (obj, self.stack[i]))
