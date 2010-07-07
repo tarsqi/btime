@@ -81,6 +81,11 @@ class TestElementFormat(TestCase):
         self.assertElementFormat("12,3456", d, (2, 2), (2, None))
 
 class TestReducedAccuracy(TestCase):
+    def test_invalid_reduction(self):
+        """Ensure valid accuracy reduction"""
+        self.assertTrue(Time(23, 20, None))
+        self.assertRaises(ValueError, lambda: Time(23, None, 50))
+
     def test_reduction(self):
         """Elide higher-order components"""
         self.assertEqual(Format("hhmm").format(Time(23, 20, 50)), "2320")
