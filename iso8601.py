@@ -51,7 +51,7 @@ class TimeUnit(object):
             minvalue, maxvalue = self.range
             return minvalue <= abs(self.value) <= maxvalue
 
-    def merge(self, other):
+    def merge(self, other, destructive=False):
         return self or other
 
     def __int__(self):
