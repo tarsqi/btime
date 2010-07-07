@@ -522,7 +522,7 @@ class Literal(FormatOp):
         self.lit = lit.upper() # see section 3.4.1, note 1
 
     def format(self, m, elt):
-        m.stack.append(self.lit)
+        m.push(self.lit)
         return False
 
     def read(self, m):
@@ -553,7 +553,7 @@ class HardSeparator(Separator):
         super(Separator, self).read(m)
         # By pushing the identity unit onto the stack, we can ensure that
         # the previous element will not be merged with the next one.
-        m.stack.append(unit)
+        m.push(unit)
         return False
 
 class Designator(Literal):
@@ -566,14 +566,14 @@ class Designator(Literal):
 
     def format(self, m, elt):
         if m.separators:
-            m.stack.append(m.separators.pop())
+            m.push(m.separators.pop())
         if elt:
             return super(Designator, self).format(m, elt)
 
     def read(self, m):
         super(Designator, self).read(m)
         if self.cls:
-            m.stack.append(self.cls())
+            m.push(self.cls())
         return True
 
     def __eq__(self, other):
@@ -584,7 +584,7 @@ class Coerce(Designator):
 
     def format(self, m, elt):
         if m.separators:
-            m.stack.append(m.separators.pop())
+            m.push(m.separators.pop())
         return Literal.format(self, m, elt)
 
     def read(self, m):
@@ -604,7 +604,7 @@ class UTCDesignator(Designator):
 
     def read(self, m):
         super(UTCDesignator, self).read(m)
-        m.stack.append(utc)
+        m.push(utc)
         return True
 
 Z = UTCDesignator()
@@ -648,7 +648,7 @@ class Element(FormatOp):
                 else:
                     # The scaling we do above won't work for 0; just fake it.
                     s += "0"*self.frac_min
-            m.stack.append(s)
+            m.push(s)
             return True
 
     def read(self, m):
@@ -656,9 +656,9 @@ class Element(FormatOp):
         if match:
             digits = match.group(1)
             frac = match.group(2) if self.frac_min else None
-            m.stack.append(self.cls(Decimal(".".join((digits, frac))) \
-                                        if frac else int(digits),
-                                    signed=self.signed))
+            m.push(self.cls(Decimal(".".join((digits, frac))) if frac \
+                                                              else int(digits),
+                            signed=self.signed))
             m.i += len(match.group(0))
             return not self.signed # don't merge signed elements
         else:
@@ -775,6 +775,7 @@ class Format(object):
     def format(self, timerep):
         self.separators = []
         self.stack = []
+        self.push = self.stack.append
         if isinstance(timerep, TimeRep):
             elts = iter(timerep)
         elif isinstance(timerep, TimeUnit):
@@ -812,6 +813,7 @@ class Format(object):
         self.input = string.upper()
         self.i = 0
         self.stack = []
+        self.push = self.stack.append
         for op in self.ops:
             if op.read(self):
                 try:
