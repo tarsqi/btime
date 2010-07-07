@@ -54,6 +54,9 @@ class TimeUnit(object):
     def merge(self, other, destructive=False):
         return self or other
 
+    def __or__(self, other):
+        return self.merge(other) or NotImplemented
+
     def __int__(self):
         return self.value
 
@@ -244,6 +247,9 @@ class TimeRep(object):
                     merged = self if destructive else self.copy()
                     merged.elements[i] = other
                     return merged
+
+    def __or__(self, other):
+        return self.merge(other) or NotImplemented
 
     def __getattr__(self, name):
         for elt in self.elements:
