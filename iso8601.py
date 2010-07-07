@@ -23,15 +23,15 @@ class TimeUnit(object):
 
     def __init__(self, value, ordinal=True, signed=None,
                  pattern=re.compile(r"([+-])?([0-9]+)(\.[0-9]+)?")):
-        if isinstance(value, basestring):
+        if value is None or isinstance(value, (int, Decimal)):
+            self.signed = signed
+            self.value = value
+        elif isinstance(value, basestring):
             m = pattern.match(value)
             if not m:
                 raise InvalidTimeUnit(self, value)
             self.signed = m.group(1)
             self.value = (Decimal if m.group(3) else int)(m.group(0))
-        elif value is None or isinstance(value, (int, Decimal)):
-            self.signed = signed
-            self.value = value
         elif isinstance(value, TimeUnit):
             self.signed = value.signed
             self.value = value.value
