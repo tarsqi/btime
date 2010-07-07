@@ -817,20 +817,20 @@ class Format(object):
         self.input = string.upper()
         self.i = 0
         self.stack = []
-        ops = iter(self.ops)
-        n = len(self.input)
-        while self.i < n:
-            if ops.next().read(self) and len(self.stack) > 1:
-                merged = self.stack[-2].merge(self.stack[-1])
+        for op in self.ops:
+            if op.read(self):
+                try:
+                    merged = self.stack[-2].merge(self.stack[-1])
+                except IndexError:
+                    continue
                 if merged:
                     self.stack[-2:] = [merged]
 
         # Now we merge bottom-up. These merges must all succeed.
         obj = self.stack[0]
-        for i in range(1, len(self.stack)):
-            merged = obj.merge(self.stack[i])
+        for other in self.stack[1:]:
+            merged = obj.merge(other)
             if not merged:
-                raise StopFormat("can't merge elements %r, %r" \
-                                     % (obj, self.stack[i]))
+                raise StopFormat("can't merge elements %r, %r" % (obj, other))
             obj = merged
         return obj
