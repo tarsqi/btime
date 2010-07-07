@@ -190,8 +190,7 @@ class Recurrences(Cardinal):
 
 def ensure_class(obj, cls):
     """Ensure that obj is an instance of cls. If cls is None, skip the check."""
-    return obj if cls is None or isinstance(obj, cls) \
-               else cls(obj)
+    return obj if cls is None or isinstance(obj, cls) else cls(obj)
 
 def units(*units):
     """A decorator factory for methods that that need to ensure their arguments
