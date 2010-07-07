@@ -541,10 +541,6 @@ class Literal(FormatOp):
         return "%s(%r)" % (type(self).__name__, self.lit)
 
 class Separator(Literal):
-    def __init__(self, lit, hard=False):
-        super(Separator, self).__init__(lit)
-        self.hard = hard
-
     def format(self, m, elt):
         # We push the literal onto a separate stack so that we don't output
         # a separator before elements that have been elided due to accuracy
@@ -552,15 +548,13 @@ class Separator(Literal):
         m.separators.append(self.lit)
         return False
 
+class HardSeparator(Separator):
     def read(self, m):
         super(Separator, self).read(m)
-        if self.hard:
-            # By pushing the identity unit onto the stack, we can ensure that
-            # the previous element will not be merged with the next one.
-            m.stack.append(unit)
-            return True
-        else:
-            return False
+        # By pushing the identity unit onto the stack, we can ensure that
+        # the previous element will not be merged with the next one.
+        m.stack.append(unit)
+        return False
 
 class Designator(Literal):
     """A designator indicates a change in syntax in the format representation;
@@ -728,7 +722,8 @@ class FormatReprParser(object):
             if char in cls.separators:
                 for i in range(level):
                     self.stack.pop()
-                return Separator(char, cls.separators[char])
+                return (HardSeparator if cls.separators[char] \
+                                      else Separator)(char)
 
     def element(self, char):
         """Consume as many of the same digit-representing characters as
