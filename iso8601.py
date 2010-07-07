@@ -665,9 +665,7 @@ class Element(FormatOp):
             m.stack.append(self.cls(Decimal(".".join((digits, frac))) \
                                         if frac else int(digits),
                                     signed=self.signed))
-            m.i += len(digits)
-            if frac:
-                m.i += len(digits) + 1 # +1 for decimal separator
+            m.i += len(match.group(0))
             return not self.signed # don't merge signed elements
         else:
             raise StopFormat("expected digit; got [%s]" % m.input[m.i])
