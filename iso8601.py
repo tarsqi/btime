@@ -529,6 +529,7 @@ class Literal(FormatOp):
 
     def __init__(self, lit):
         self.lit = lit.upper() # see section 3.4.1, note 1
+        self.n = len(self.lit)
 
     def format(self, m, elt):
         m.push(self.lit)
@@ -536,11 +537,11 @@ class Literal(FormatOp):
 
     def read(self, m):
         if not self.lit or m.input.startswith(self.lit, m.i):
-            m.i += len(self.lit)
+            m.i += self.n
             return False
         else:
             raise StopFormat("expected [%s], got [%s]" % \
-                                 (self.lit, m.input[m.i:m.i+len(self.lit)]))
+                                 (self.lit, m.input[m.i:m.i+self.n]))
 
     def __eq__(self, other):
         return ((isinstance(other, basestring) and self.lit == other.upper()) or
