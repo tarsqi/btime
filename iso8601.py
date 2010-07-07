@@ -232,7 +232,15 @@ class TimeRep(object):
         self.reduced_accuracy = lse < len(elements) - 1
 
     def copy(self):
-        return type(self)(*self.elements)
+        # Making a copy this way lets us bypass calling the __init__ method,
+        # which performs checks and coercions that have already been done.
+        # It's therefore significantly faster than the naïve (but correct):
+        #     return type(self)(*self.elements)
+        # The critical assumption here is that the only thing that matters is
+        # the elements list; should that ever change, this will not work.
+        obj = self.__new__(type(self))
+        obj.elements = self.elements[:]
+        return obj
 
     def merge(self, other, destructive=False):
         if isinstance(other, type(self)):
