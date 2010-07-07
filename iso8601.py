@@ -795,14 +795,14 @@ class Format(object):
         n = len(self.input)
         while self.i < n:
             if ops.next().read(self) and len(self.stack) > 1:
-                merged = self.stack[-2].merge(self.stack[-1])
+                merged = self.stack[-2].merge(self.stack[-1], True)
                 if merged:
                     self.stack[-2:] = [merged]
 
         # Now we merge bottom-up. These merges must all succeed.
         obj = self.stack[0]
         for i in range(1, len(self.stack)):
-            merged = obj.merge(self.stack[i])
+            merged = obj.merge(self.stack[i], True)
             if not merged:
                 raise StopFormat("can't merge elements %r, %r" \
                                      % (obj, self.stack[i]))
