@@ -532,6 +532,8 @@ class Literal(FormatOp):
         self.n = len(self.lit)
 
     def format(self, m, elt):
+        if m.separators:
+            m.push(m.separators.pop())
         m.push(self.lit)
         return False
 
@@ -575,8 +577,7 @@ class Designator(Literal):
         self.cls = cls
 
     def format(self, m, elt):
-        if m.separators:
-            m.push(m.separators.pop())
+        # Only format a (prefix) designator if an element follows.
         if elt:
             return super(Designator, self).format(m, elt)
 
@@ -593,8 +594,6 @@ class Coerce(Designator):
     """A postfix designator, like the ones used in duration representations."""
 
     def format(self, m, elt):
-        if m.separators:
-            m.push(m.separators.pop())
         return Literal.format(self, m, elt)
 
     def read(self, m):
