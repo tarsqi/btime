@@ -215,10 +215,15 @@ class TimeRep(object):
     designators = {}
     separators = {}
 
-    def __init__(self, *elements):
-        self.elements = list(elements)
+    def __init__(self, elements, unchecked=(), check=True):
+        """Initialize a time representation from a tuple of elements.
+        Elements that should never be part of the usual accuracy reduction
+        check may be passed in the unchecked parameter."""
+        if check:
+            self.check_accuracy(elements)
+        self.elements = list(elements + unchecked)
 
-    def check_accuracy(self, *elements):
+    def check_accuracy(self, elements):
         """Given a list of elements in most-significant-first order, check
         for legitimate omissions. Omission of an element is allowed only if
         all of the more significant elements are supplied."""
@@ -328,8 +333,7 @@ class CalendarDate(Date):
 
     @units(Year, Month, Day)
     def __init__(self, *args):
-        self.check_accuracy(*args)
-        super(CalendarDate, self).__init__(*args)
+        TimeRep.__init__(self, args)
 
 class OrdinalDate(Date):
     digits = {"Y": Year, "D": DayOfYear}
@@ -337,8 +341,7 @@ class OrdinalDate(Date):
 
     @units(Year, Day)
     def __init__(self, *args):
-        self.check_accuracy(*args)
-        super(OrdinalDate, self).__init__(*args)
+        TimeRep.__init__(self, args)
 
 class WeekDate(Date):
     digits = {"Y": Year, "w": Week, "D": DayOfWeek}
@@ -346,8 +349,7 @@ class WeekDate(Date):
 
     @units(Year, Week, Day)
     def __init__(self, *args):
-        self.check_accuracy(*args)
-        super(WeekDate, self).__init__(*args)
+        TimeRep.__init__(self, args)
 
 class UTCOffset(TimePoint):
     digits = {"h": Hour, "m": Minute}
@@ -355,14 +357,13 @@ class UTCOffset(TimePoint):
 
     @units(Hour, Minute)
     def __init__(self, hour=0, minute=None):
-        self.check_accuracy(hour, minute)
-        super(UTCOffset, self).__init__(hour, minute)
+        TimeRep.__init__(self, (hour, minute))
 
 class UTC(UTCOffset):
     stdformat = "Z"
 
     def __init__(self):
-        super(UTC, self).__init__(0, 0)
+        TimeRep.__init__(self, (0, 0))
 
 utc = UTC()
 
@@ -374,8 +375,10 @@ class Time(TimePoint):
 
     @units(Hour, Minute, Second, UTCOffset)
     def __init__(self, hour=None, minute=None, second=None, offset=None):
-        self.check_accuracy(hour, minute, second)
-        super(Time, self).__init__(hour, minute, second, offset)
+        # The offset from UTC should not be a part of the usual check for
+        # valid accuracy reduction.
+        TimeRep.__init__(self, (hour, minute, second), (offset,))
+
         # These attribute assignments are purely for optimization purposes:
         # they speed up a common merge case by bypassing the (expensive) calls
         # to __getattr__.
@@ -399,8 +402,7 @@ class DateTime(Date, Time):
 
     @units(Date, Time)
     def __init__(self, date, time):
-        self.check_accuracy(date, time)
-        TimeRep.__init__(self, date, time)
+        TimeRep.__init__(self, (date, time))
         # Purely an optimization; see note in Time.__init__, above.
         self.date = date
         self.time = time
@@ -424,8 +426,7 @@ class Duration(TimeRep):
 
     @units(Years, Months, Days, Hours, Minutes, Seconds)
     def __init__(self, *args):
-        self.check_accuracy(*args)
-        super(Duration, self).__init__(*args)
+        TimeRep.__init__(self, args)
 
     def merge(self, other):
         if isinstance(other, Weeks):
@@ -454,7 +455,7 @@ class WeeksDuration(Duration):
 
     @units(Weeks)
     def __init__(self, weeks=None):
-        TimeRep.__init__(self, weeks)
+        TimeRep.__init__(self, (weeks,))
 
 class TimeInterval(DateTime):
     designators = {"P": Duration}
@@ -462,7 +463,7 @@ class TimeInterval(DateTime):
 
     def __init__(self, *args):
         assert len(args) <= 2, "too many end-points for a time interval"
-        TimeRep.__init__(self, *args)
+        TimeRep.__init__(self, args)
 
     def __str__(self):
         return "/".join(map(str, self.elements))
@@ -474,7 +475,7 @@ class RecurringTimeInterval(TimeInterval):
     @units(Recurrences)
     def __init__(self, *args):
         assert len(args) <= 3
-        TimeRep.__init__(self, *args)
+        TimeRep.__init__(self, args)
 
     def merge(self, other):
         if isinstance(other, (DateTime, Duration)):
