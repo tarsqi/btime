@@ -216,23 +216,20 @@ class TimeRep(object):
     separators = {}
 
     def __init__(self, elements, unchecked=()):
-        """Initialize a time representation from a tuple of elements.
-        Elements that should never be part of the usual accuracy reduction
-        check may be passed in the unchecked parameter."""
-        self.check_accuracy(elements)
+        """Initialize a time representation from a tuple of elements. The
+        elements must be in most-significant-first order, and omission of
+        an element is allowed only if all of the more significant elements
+        are supplied. Elements that should never be part of this check
+        may be passed in the unchecked parameter."""
+        omitted = False
+        for elt in elements:
+            if omitted:
+                if elt:
+                    raise ValueError("invalid date/time accuracy reduction")
+            else:
+                omitted = not elt
+        self.reduced_accuracy = omitted
         self.elements = list(elements + unchecked)
-
-    def check_accuracy(self, elements):
-        """Given a list of elements in most-significant-first order, check
-        for legitimate omissions. Omission of an element is allowed only if
-        all of the more significant elements are supplied."""
-        lse = -1
-        for i, elt in reversed(tuple(enumerate(elements))):
-            if lse >= 0 and not elt:
-                raise ValueError("invalid date/time accuracy reduction")
-            elif elt and lse < 0:
-                lse = i
-        self.reduced_accuracy = lse < len(elements) - 1
 
     def copy(self):
         # Making a copy this way lets us bypass calling the __init__ method,
