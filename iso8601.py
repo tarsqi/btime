@@ -675,6 +675,7 @@ class Element(FormatOp):
                 self.max == other.max and
                 self.frac_min == other.frac_min and
                 self.frac_max == other.frac_max and
+                self.separator == self.separator and
                 self.signed == other.signed)
 
     def __repr__(self):
