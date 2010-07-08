@@ -1,5 +1,10 @@
 # -*- mode: Python; coding: utf-8 -*-
 
+"""An implementation of ISO 8601:2004(E).
+
+This implementation supports not only the interchange of representations of
+dates and times, but the format representations as well."""
+
 from decimal import Decimal
 from functools import wraps
 from itertools import chain, repeat, izip as zip
