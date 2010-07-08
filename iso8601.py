@@ -499,12 +499,14 @@ RecurringTimeInterval.designators["R"] = RecurringTimeInterval
 # representations defined in ISO 8601; e.g., [YYYYMMDD] for a calendar date
 # or [YYYYMMDDThhmmss] for calendar date and local time. Some deviation
 # from the standard format representations is permitted, but only to a
-# point. Format representations can be used for both reading and formatting
-# (printing) of date and time representations.
-
+# point; in particular, the most-significant-element-first ordering must
+# be maintained. Format representations can be used for both reading and
+# formatting (printing) of date and time representations.
+#
 # Format representations are parsed by the FormatReprParser class into a list
 # of operations for a simple virtual machine implemented by the Format class.
-# These operations are called format ops, or fops.
+# These operations are called format ops, or fops. The same list of fops is
+# used for reading and formatting.
 
 class StopFormat(Exception):
     """Halt the execution of a format machine."""
