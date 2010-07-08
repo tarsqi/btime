@@ -710,7 +710,7 @@ class FormatReprParser(object):
                 # Postfix designator: coerce the last element.
                 return Coerce(char, designate)
             else:
-                # Prefix designator; possibly change syntax class.
+                # Prefix designator: possibly change syntax class.
                 if designate:
                     self.stack.append(designate)
                 return PrefixDesignator(char, designate)
