@@ -416,26 +416,10 @@ class DateTime(Date, Time):
     def __str__(self):
         return "T".join(map(str, self.elements))
 
-class TimeDuration(TimeRep):
-    """Represents a duration consisting of hours, minutes, and seconds.
-
-    This class exists primarily because the [M] designator in a duration
-    representation is ambiguous; before a [T] it means months, but after
-    it means minutes. In order to disambiguate, [T] switches the syntax
-    class to this class."""
-
-    digits = {"n": TimeUnit}
-    designators = {"H": Hours, "M": Minutes, "S": Seconds}
-
-    @units(Hours, Minutes, Seconds)
-    def __init__(self, hours=0, minutes=0, seconds=0):
-        self.check_accuracy(hours, minutes, seconds)
-        super(TimeDuration, self).__init__(hours, minutes, seconds)
-
 class Duration(TimeRep):
     digits = {"n": TimeUnit}
     designators = {"W": Weeks, "Y": Years, "M": Months, "D": Days,
-                   "T": TimeDuration}
+                   "T": None} # will be TimeDuration; see below
     stdformat = u"Pnn̲Ynn̲Mnn̲DTnn̲Hnn̲Mnn̲S"
 
     @units(Years, Months, Days, Hours, Minutes, Seconds)
@@ -453,6 +437,17 @@ class Duration(TimeRep):
             return TimeInterval(self, other)
         else:
             return super(Duration, self).merge(other)
+
+class TimeDuration(Duration):
+    """The [M] designator in a duration representation is ambiguous: before [T]
+    it means months, but after it means minutes. In order to disambiguate,
+    the [T] designator switches the syntax to this class."""
+
+    designators = {"H": Hours, "M": Minutes, "S": Seconds}
+
+# We can't do this assignment in Duration, above, because the class doesn't
+# exist at that time.
+Duration.designators["T"] = TimeDuration
 
 class WeeksDuration(Duration):
     stdformat = u"Pnn̲W"
