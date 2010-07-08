@@ -576,8 +576,9 @@ class Designator(Literal):
         super(Designator, self).__init__(lit)
         self.cls = cls
 
+class PrefixDesignator(Designator):
     def format(self, m, elt):
-        # Only format a (prefix) designator if an element follows.
+        # Only format a prefix designator if an element follows.
         if elt:
             return super(Designator, self).format(m, elt)
 
@@ -593,12 +594,9 @@ class Designator(Literal):
 class Coerce(Designator):
     """A postfix designator, like the ones used in duration representations."""
 
-    def format(self, m, elt):
-        return Literal.format(self, m, elt)
-
     def read(self, m):
         """Coerce the element on the top of the stack to a different type."""
-        Literal.read(self, m)
+        super(Coerce, self).read(m)
         m.stack[-1] = self.cls(m.stack[-1])
         return True
 
@@ -607,9 +605,6 @@ class UTCDesignator(Designator):
 
     def __init__(self):
         super(UTCDesignator, self).__init__("Z", UTCOffset)
-
-    def format(self, m, elt):
-        return Literal.format(self, m, elt)
 
     def read(self, m):
         super(UTCDesignator, self).read(m)
@@ -722,9 +717,10 @@ class FormatReprParser(object):
                 # Postfix designator: coerce the last element.
                 return Coerce(char, designate)
             else:
+                # Prefix designator; possibly change syntax class.
                 if designate:
-                    self.stack.append(designate) # push new syntax class
-                return Designator(char, designate)
+                    self.stack.append(designate)
+                return PrefixDesignator(char, designate)
 
     def separator(self, char):
         for level, cls in enumerate(reversed(self.stack)):

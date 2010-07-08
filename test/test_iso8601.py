@@ -43,7 +43,7 @@ class TestFormatReprParser(TestCase):
 
     def test_designator(self):
         """Designator in format representation"""
-        self.assertFormatRepr("T", Designator("T", Time))
+        self.assertFormatRepr("T", PrefixDesignator("T", Time))
 
 class TestElementFormat(TestCase):
     class FormatOneOp(Format):
