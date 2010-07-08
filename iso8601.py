@@ -670,20 +670,12 @@ class Element(FormatOp):
 
     def __eq__(self, other):
         return (isinstance(other, type(self)) and
-                self.cls is other.cls and
-                self.min == other.min and
-                self.max == other.max and
-                self.frac_min == other.frac_min and
-                self.frac_max == other.frac_max and
-                self.separator == self.separator and
-                self.signed == other.signed)
+                self.__dict__ == other.__dict__)
 
     def __repr__(self):
         return "%s(%s, (%s, %s), (%s, %s), %r, %r)" \
-            % (type(self).__name__,
-               self.cls.__name__,
-               self.min, self.max,
-               self.frac_min, self.frac_max,
+            % (type(self).__name__, self.cls.__name__,
+               self.min, self.max, self.frac_min, self.frac_max,
                self.separator, self.signed)
 
 class FormatReprParser(object):
@@ -755,13 +747,14 @@ class FormatReprParser(object):
         if self.peek() in (",", "."):
             separator = self.next()
             frac, frac_repeat = snarf()
+            return Element(self.syntax.digits[char],
+                           (digits, None if repeat else digits),
+                           (frac, None if frac_repeat else frac),
+                           separator, signed)
         else:
-            separator = None
-            frac, frac_repeat = None, False
-        return Element(self.syntax.digits[char],
-                       (digits, None if repeat else digits),
-                       (frac, None if frac_repeat else frac),
-                       separator, signed)
+            return Element(self.syntax.digits[char],
+                           (digits, None if repeat else digits),
+                           signed=signed)
 
     @property
     def syntax(self):
