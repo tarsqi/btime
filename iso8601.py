@@ -215,12 +215,11 @@ class TimeRep(object):
     designators = {}
     separators = {}
 
-    def __init__(self, elements, unchecked=(), check=True):
+    def __init__(self, elements, unchecked=()):
         """Initialize a time representation from a tuple of elements.
         Elements that should never be part of the usual accuracy reduction
         check may be passed in the unchecked parameter."""
-        if check:
-            self.check_accuracy(elements)
+        self.check_accuracy(elements)
         self.elements = list(elements + unchecked)
 
     def check_accuracy(self, elements):
