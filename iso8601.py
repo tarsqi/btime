@@ -228,7 +228,6 @@ class TimeRep(object):
                     raise ValueError("invalid date/time accuracy reduction")
             else:
                 omitted = not elt
-        self.reduced_accuracy = omitted
         self.elements = list(elements + unchecked)
 
     def copy(self):
