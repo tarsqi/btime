@@ -454,7 +454,7 @@ class WeeksDuration(Duration):
 
     @units(Weeks)
     def __init__(self, weeks=None):
-        super(Duration, self).__init__(weeks)
+        TimeRep.__init__(self, weeks)
 
 class TimeInterval(DateTime):
     designators = {"P": Duration}
