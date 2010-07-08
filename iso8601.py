@@ -573,16 +573,17 @@ class PrefixDesignator(Designator):
     def format(self, m, elt):
         # Only format a prefix designator if an element follows.
         if elt:
-            return super(Designator, self).format(m, elt)
+            return super(PrefixDesignator, self).format(m, elt)
 
     def read(self, m):
-        super(Designator, self).read(m)
+        super(PrefixDesignator, self).read(m)
         if self.cls:
             m.push(self.cls())
         return True
 
     def __eq__(self, other):
-        return super(Designator, self).__eq__(other) and self.cls is other.cls
+        return (super(PrefixDesignator, self).__eq__(other) and
+                self.cls is other.cls)
 
 class Coerce(Designator):
     """A postfix designator, like the ones used in duration representations."""
