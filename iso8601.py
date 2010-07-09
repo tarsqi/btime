@@ -24,7 +24,7 @@ class InvalidTimeUnit(Exception):
 class TimeUnit(object):
     """A unit of time."""
 
-    range = (0, None)
+    range = (0, None) # inclusive bounds on absolute value; None = ∞
 
     def __init__(self, value, ordinal=True, signed=None,
                  pattern=re.compile(r"([+-])?([0-9]+)(\.[0-9]+)?")):
@@ -50,10 +50,12 @@ class TimeUnit(object):
         if self.value is None:
             return True # None is always a valid value
         minvalue, maxvalue = self.range
-        if maxvalue:
+        if maxvalue is not None:
             return minvalue <= abs(self.value) <= maxvalue
-        else:
+        elif minvalue is not None:
             return minvalue <= abs(self.value)
+        else:
+            return True
 
     def merge(self, other):
         return self or other
