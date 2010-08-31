@@ -109,12 +109,11 @@ class AttributeGrammar(Grammar):
         productions = []
         self.actions = {}
         for x in productions_and_actions:
-            if isinstance(x, tuple) and len(x) == 2:
+            if isinstance(x, tuple):
                 rule, action = x
                 productions.append(rule)
                 if action:
-                    assert isinstance(action, FunctionType), \
-                        "action must be a function"
+                    assert isinstance(action, FunctionType), "invalid action"
                     self.actions[rule] = action
             elif isinstance(x, Production):
                 productions.append(x)
