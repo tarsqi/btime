@@ -57,9 +57,9 @@ class GrammarSpecTokenizer(object):
             if type in (INDENT, DEDENT, NL, COMMENT):
                 return getnext() # don't care
             elif type == OP:
-                if value in "([{":
+                if value in self.delimiters.keys():
                     self.delimstack.append(self.delimiters[value])
-                elif value in "}])":
+                elif value in self.delimiters.values():
                     if self.delimstack.pop() != value:
                         raise TokenError("improperly nested delimiters")
             return token
