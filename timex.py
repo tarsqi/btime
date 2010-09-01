@@ -3,7 +3,7 @@ from datetime import date
 from cfg import *
 from earley import Parser
 from grammarparser import parse_grammar_spec
-from timerep import *
+from iso8601 import *
 
 class DayOfMonthToken(RegexpTerminal):
     def __init__(self):
