@@ -2,9 +2,8 @@ timex -> time | date
 
 time -> hour { Time(_[0]) }
     | hour minute { Time(_[0], _[1]) }
-    | "half" "past" hour { Time(_[2], 30) }
-    | "quarter" r"past|after" hour { Time(_[2], 15) }
-    | "quarter" r"of|to|before" hour { Time(_[2]-1, 45) }
+    | minute r"past|after" hour { Time(_[2], _[0]) }
+    | minute r"of|to|before|'?till" hour { Time(_[2]-1, 60-int(_[0])) }
 
 hour -> small { Hour(_[0]) }
     | small r"o'?clock" { Hour(_[0]) }
@@ -12,6 +11,11 @@ hour -> small { Hour(_[0]) }
     | r"[0-9]{1,2}$" r"o'?clock" { Hour(_[0]) }
     | "noon" { Hour(12) }
     | "midnight" { Hour(0) }
+
+minute -> small { Minute(_[0]) }
+    | r"[0-9]{1,2}$" { Minute(_[0]) }
+    | "quarter" { Minute(15) }
+    | "half" { Minute(30) }
 
 date -> day month year { CalendarDate(_[2], _[1], _[0]) }
     | month day year { CalendarDate(_[2], _[0], _[1]) }
