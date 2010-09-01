@@ -19,7 +19,7 @@ class MonthNumberToken(RegexpTerminal):
         super(MonthNumberToken, self).__init__(r"([0-9]{1,2})$", "month number")
 
     def match(self, token):
-        m = super(MonthNumber, self).match(token)
+        m = super(MonthNumberToken, self).match(token)
         return m and 1 <= int(m.group(1)) <= 12
 
 def read_grammar(filename="timex-grammar.txt"):

@@ -23,7 +23,8 @@ date -> day month year { CalendarDate(_[2], _[1], _[0]) }
 day -> number { DayOfMonth(_[0]) }
     | DayOfMonthToken() { DayOfMonth(_[0]) }
 
-month -> Abbrev("january", 3) { Month(1) }
+month -> MonthNumberToken() { Month(_[0]) }
+    | Abbrev("january", 3) { Month(1) }
     | Abbrev("february", 3) { Month(2) }
     | Abbrev("march", 3) { Month(3) }
     | Abbrev("april", 3) { Month(4) }
