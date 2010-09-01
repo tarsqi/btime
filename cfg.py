@@ -49,7 +49,8 @@ class Abbrev(Terminal):
         self.min = min_prefix_len
 
     def match(self, token):
-        return (len(token) >= self.min and
+        return (token is not None and
+                len(token) >= self.min and
                 self.string.startswith(token.rstrip(".")))
 
 class Production(object):
