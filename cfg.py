@@ -17,10 +17,13 @@ class Terminal(object):
 
 class Literal(Terminal):
     def __init__(self, lit):
-        self.lit = lit
+        self.lit = unicode(lit)
 
     def match(self, token):
-        return self.lit == token
+        return self.lit == unicode(token)
+
+    def __repr__(self):
+        return "Literal(%r)" % self.lit
 
     def __str__(self):
         return self.lit
@@ -31,7 +34,7 @@ class RegexpTerminal(Terminal):
         self.name = name or pattern
 
     def match(self, token):
-        return token is not None and self.pattern.match(token)
+        return token is not None and self.pattern.match(unicode(token))
 
     def __str__(self):
         return self.name
@@ -49,9 +52,11 @@ class Abbrev(Terminal):
         self.min = min_prefix_len
 
     def match(self, token):
-        return (token is not None and
-                len(token) >= self.min and
-                self.string.startswith(token.rstrip(".")))
+        if token is None:
+            return False
+        string = unicode(token)
+        return (len(string) >= self.min and
+                self.string.startswith(string.rstrip(".")))
 
 class Production(object):
     """A production rule consists of a left-hand side (LHS) and a
