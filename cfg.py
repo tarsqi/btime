@@ -136,6 +136,15 @@ class ParseTree(object):
         self.node = node
         self.children = list(children) if children else None
 
+    def leaves(self):
+        """Yield the leaves of the parse tree, in order."""
+        for child in self.children:
+            if isinstance(child, ParseTree):
+                for leaf in child.leaves():
+                    yield leaf
+            else:
+                yield child
+
     def __getitem__(self, index):
         return self.children[index]
 
