@@ -1,7 +1,6 @@
 timex -> time | date
 
-time -> hour { Time(_[0]) }
-    | hour minute { Time(_[0], _[1]) }
+time -> hour minute { Time(_[0], _[1]) }
     | minute r"past|after" hour { Time(_[2], _[0]) }
     | minute r"of|to|before|'?till" hour { Time(_[2]-1, 60-int(_[0])) }
 
