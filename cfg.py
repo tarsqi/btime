@@ -67,9 +67,11 @@ class Production(object):
     def __init__(self, lhs, rhs):
         self.lhs = lhs
         self.rhs = tuple(rhs) if isinstance(rhs, (list, tuple)) else (rhs,)
+        self.len = len(self.rhs)
+        self.hash = hash(self.lhs) ^ hash(self.rhs)
 
     def __len__(self):
-        return len(self.rhs)
+        return self.len
 
     def __eq__(self, other):
         return (isinstance(other, self.__class__) and
@@ -80,7 +82,7 @@ class Production(object):
         return not (self == other)
 
     def __hash__(self):
-        return hash(self.lhs) ^ hash(self.rhs)
+        return self.hash
 
     def __repr__(self):
         return "Production(%s, %s)" % (self.lhs, self.rhs)
