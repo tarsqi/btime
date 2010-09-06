@@ -74,37 +74,36 @@ class Parser(object):
             # It's not worth checking that i == len(self.chart); we'll just
             # assume it. If it's not, another IndexError will be raised.
             self.chart.append([])
+            self.state_cache.append({})
             return self.chart[i]
 
     def __len__(self):
         return len(self.chart)
 
-    def push_state(self, state, i):
-        if state not in self[i]:
-            self[i].append(state)
-
     def complete(self, state, i):
         for prev in self[state.start][:]:
-            if not prev.complete and prev.next == state.rule.lhs:
-                self.push_state(prev.advance(state), i)
+            if not prev.complete and prev.next == state.rule.lhs and \
+               (prev.rule, prev.start, prev.dot+1) not in self.state_cache[i]:
+                self.chart[i].append(prev.advance(state))
+                self.state_cache[i][(prev.rule, prev.start, prev.dot+1)] = True
 
     def predict(self, state, i):
         for rule in self.grammar[state.next]:
-            # We could just use push_state here, but this is part of the
-            # inner loop, and doing this fast scan over the state set makes
-            # a huge difference in performance.
-            for state in self[i]:
-                if state.rule is rule and state.start == i and state.dot == 0:
-                    break
-            else:
-                self[i].append(State(rule, i))
+            if (rule, i, 0) not in self.state_cache[i]:
+                self.chart[i].append(State(rule, i, 0))
+                self.state_cache[i][(rule, i, 0)] = True
 
     def scan(self, state, i, token):
         if state.next.match(token):
-            self.push_state(state.advance(token), i+1)
+            self[i+1] # touch and maybe extend
+            entry = (state.rule, state.start, state.dot+1)
+            if entry not in self.state_cache[i+1]:
+                self.chart[i+1].append(state.advance(token))
+                self.state_cache[i+1][entry] = True
 
     def parse(self, input):
         self.chart = [[State(Production(self.start, self.grammar.start), 0)]]
+        self.state_cache = [{}]
 
         # We have n+1 state sets to process, so we tack on an extra dummy
         # token to the input.
