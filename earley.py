@@ -82,7 +82,6 @@ class Parser(object):
     def push_state(self, state, i):
         if state not in self[i]:
             self[i].append(state)
-            self.more = True
 
     def complete(self, state, i):
         for prev in self[state.start][:]:
@@ -99,7 +98,6 @@ class Parser(object):
                     break
             else:
                 self[i].append(State(rule, i))
-                self.more = True
 
     def scan(self, state, i, token):
         if state.next.match(token):
@@ -111,18 +109,13 @@ class Parser(object):
         # We have n+1 state sets to process, so we tack on an extra dummy
         # token to the input.
         for i, token in enumerate(itertools.chain(input, [None])):
-            self.more = True
-            while self.more:
-                # The `more' flag will be set to true only when a new state
-                # has been added by the completer, scanner, or predictor.
-                self.more = False
-                for state in self[i][:]:
-                    if state.complete:
-                        self.complete(state, i)
-                    elif isinstance(state.next, Terminal):
-                        self.scan(state, i, token)
-                    else:
-                        self.predict(state, i)
+            for state in self[i]:
+                if state.complete:
+                    self.complete(state, i)
+                elif isinstance(state.next, Terminal):
+                    self.scan(state, i, token)
+                else:
+                    self.predict(state, i)
 
     def parses(self, tree_class=ParseTree):
         """Yield the completed parse trees."""
