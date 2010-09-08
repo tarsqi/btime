@@ -1,25 +1,25 @@
-timex -> time | date
+timex -> time | date | interval
 
-time -> hour minute { Time(_[0], _[1]) }
+time -> named_hour { Time(_[0]) }
+    | hour ":" minute { Time(_[0], _[2]) }
     | minute r"past|after" hour { Time(_[2], _[0]) }
     | minute r"of|to|before|'?till" hour { Time(_[2]-1, 60-int(_[0])) }
 
-hour -> small { Hour(_[0]) }
-    | small r"o'?clock" { Hour(_[0]) }
-    | r"[0-9]{1,2}$" { Hour(_[0]) }
-    | r"[0-9]{1,2}$" r"o'?clock" { Hour(_[0]) }
+hour -> named_hour
+    | small { Hour(_[0]) }
+
+named_hour -> small r"o'?clock" { Hour(_[0]) }
     | "noon" { Hour(12) }
     | "midnight" { Hour(0) }
 
 minute -> small { Minute(_[0]) }
-    | r"[0-9]{1,2}$" { Minute(_[0]) }
     | "quarter" { Minute(15) }
     | "half" { Minute(30) }
 
 date -> day month year { CalendarDate(_[2], _[1], _[0]) }
     | month day year { CalendarDate(_[2], _[0], _[1]) }
 
-day -> number { DayOfMonth(_[0]) }
+day -> small { DayOfMonth(_[0]) }
     | DayOfMonthToken() { DayOfMonth(_[0]) }
 
 month -> MonthNumberToken() { Month(_[0]) }
@@ -36,11 +36,31 @@ month -> MonthNumberToken() { Month(_[0]) }
     | Abbrev("november", 3) { Month(11) }
     | Abbrev("december", 3) { Month(12) }
 
-year -> number | r"[0-9]{1,4}$" { Year(_[0]) }
+year -> cardinal | r"[0-9]{1,4}$" { Year(_[0]) }
 
-number -> zero | small | hundreds | thousands
-zero -> r"(zero|oh?|n?[ao]ught)$" { 0 }
-small -> ones
+interval -> duration
+
+duration -> period { Duration() | _[0] }
+    | duration period { _[0] | _[1] }
+    | duration "and" period { _[0] | _[2] }
+    | duration "period"
+
+period -> number r"seconds?" { Seconds(_[0]) }
+    | number r"minutes?" { Minutes(_[0]) }
+    | number r"hours?" { Hours(_[0]) }
+    | number r"days?" { Days(_[0]) }
+    | number r"weeks?" { Weeks(_[0]) }
+    | number r"months?" { Months(_[0]) }
+    | number r"years?" { Years(_[0]) }
+
+number -> r"[0-9]+$" { int(_[0]) }
+    | cardinal
+
+cardinal -> zero | small | hundreds | thousands
+zero -> "0" { 0 }
+    | r"(zero|oh?|n?[ao]ught)$" { 0 }
+small -> r"[0-9]{1,2}$" { int(_[0]) }
+    | ones
     | zero ones { _[1] }
     | teen
     | tens
