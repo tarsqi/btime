@@ -26,7 +26,36 @@ def read_grammar(filename="timex-grammar.txt"):
     with open(filename) as f:
         return parse_grammar_spec(f.readline, "timex", globals())
 
-def parse_timex(timex, grammar=read_grammar()):
+def sentences(s):
+    """Given a string of English text with normalized spacing (i.e., exactly
+    one space between words), yield sentences of that string, one at a time."""
+    i, j, n = 0, 0, len(s)
+    while j < n:
+        if s[j] in ".?!":
+            try:
+                if s[j+1] == " " and s[j+2].isupper():
+                    # Punctuation that is immediately followed by a space
+                    # and an upper-case letter is assumed to mark the end
+                    # of a sentence. This simple heuristic works most of
+                    # the time, but will be fooled by abbreviations.
+                    yield s[i:j+1]
+                    i = j = j + 2
+                    continue
+            except IndexError:
+                pass
+        j += 1
+    if i < n and i < j:
+        yield s[i:j]
+
+def parse_sentence(sentence, grammar=read_grammar()):
     parser = Parser(grammar)
-    parser.parse(timex.replace("-", " ").split(" "))
-    return parser.grammar.eval(parser.parses().next())
+    toks = sentence.replace("-", " ").split(" ")
+    while toks:
+        parser.parse(toks)
+        try:
+            tree = parser.parses().next()
+            yield parser.grammar.eval(tree)
+            del toks[0:len(list(tree.leaves()))]
+        except StopIteration:
+            yield toks.pop(0)
+
