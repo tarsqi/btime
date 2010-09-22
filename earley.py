@@ -28,9 +28,7 @@ class State(object):
                            for x in self.matched])
 
     def __eq__(self, other):
-        # N.B.: We should really say self.rule == other.rule, but this
-        # method is part of the inner loop, and needs to be fast.
-        return (self.rule is other.rule and
+        return (self.rule == other.rule and
                 self.start == other.start and
                 self.dot == other.dot)
 
