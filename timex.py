@@ -1,3 +1,5 @@
+import re
+
 from cfg import *
 from earley import Parser
 from grammarparser import parse_grammar_spec
@@ -23,6 +25,10 @@ class MonthNumberToken(RegexpTerminal):
 def read_grammar(filename="timex-grammar.txt"):
     with open(filename) as f:
         return parse_grammar_spec(f.readline, "timex", globals())
+
+def normalize_space(s):
+    """Replace all runs of whitespace with a single space."""
+    return " ".join(re.split(r"\s+", s))
 
 def sentences(s):
     """Given a string of English text with normalized spacing (i.e., exactly
