@@ -1,5 +1,3 @@
-from datetime import date
-
 from cfg import *
 from earley import Parser
 from grammarparser import parse_grammar_spec
