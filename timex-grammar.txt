@@ -106,6 +106,10 @@ thousands -> small small { _[0] * 100 + _[1] }
     | hundreds "thousand" "and" small { (_[0] * 1000) + _[3] }
     | hundreds "thousand" hundreds { (_[0] * 1000) + _[2] }
 
-some -> "couple" { 2 }
-    | "couple" "of" { 2 }
+some -> couple
+    | "a" couple { _[1] }
     | "few" { 3 }
+    | "a" "few" { 3 }
+
+couple -> "couple" { 2 }
+    | "couple" "of" { 2 }
