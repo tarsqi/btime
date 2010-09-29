@@ -55,6 +55,7 @@ period -> number r"seconds?" { Seconds(_[0]) }
 
 number -> r"[0-9]+$" { int(_[0]) }
     | cardinal
+    | some
 
 cardinal -> zero | small | hundreds | thousands
 zero -> "0" { 0 }
@@ -104,3 +105,7 @@ thousands -> small small { _[0] * 100 + _[1] }
     | hundreds "thousand" small { (_[0] * 1000) + _[2] }
     | hundreds "thousand" "and" small { (_[0] * 1000) + _[3] }
     | hundreds "thousand" hundreds { (_[0] * 1000) + _[2] }
+
+some -> "couple" { 2 }
+    | "couple" "of" { 2 }
+    | "few" { 3 }
