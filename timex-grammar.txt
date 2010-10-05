@@ -1,4 +1,15 @@
-timex -> time | date | interval
+timex -> present { Now() } | date | time | day_of_week | month | interval
+
+present -> "now"
+    | "today"
+    | "this" "time"
+    | "current" "time"
+    | "currently"
+    | "the" "current" "time"
+    | "present"
+    | "presently"
+    | "present" "time"
+    | "the" "present" "time"
 
 time -> named_hour { Time(_[0]) }
     | hour ":" minute { Time(_[0], _[2]) }
@@ -38,7 +49,21 @@ month -> MonthNumberToken() { Month(_[0]) }
 
 year -> cardinal | r"[0-9]{1,4}$" { Year(_[0]) }
 
-interval -> duration
+day_of_week -> Abbrev("monday", 3) { DayOfWeek(1) }
+    | Abbrev("tuesday", 3) { DayOfWeek(2) }
+    | Abbrev("wednesday", 3) { DayOfWeek(3) }
+    | Abbrev("thursday", 3) { DayOfWeek(4) }
+    | Abbrev("friday", 3) { DayOfWeek(5) }
+    | Abbrev("saturday", 3) { DayOfWeek(6) }
+    | Abbrev("sunday", 3) { DayOfWeek(7) }
+
+interval -> anchored_interval | duration
+
+anchored_interval -> "past" duration { PastAnchoredInterval(_[1]) }
+    | "last" duration { PastAnchoredInterval(_[1]) }
+    | "next" duration { FutureAnchoredInterval(_[2]) }
+    | "coming" duration { FutureAnchoredInterval(_[2]) }
+    | "the" anchored_interval { _[1] }
 
 duration -> period { Duration() | _[0] }
     | duration period { _[0] | _[1] }
@@ -47,15 +72,21 @@ duration -> period { Duration() | _[0] }
 
 period -> number r"seconds?" { Seconds(_[0]) }
     | number r"minutes?" { Minutes(_[0]) }
+    | number r"minutes?" "and" fraction { Minutes(_[0]) | Seconds(60*_[3]) }
     | number r"hours?" { Hours(_[0]) }
+    | number r"hours?" "and" fraction { Hours(_[0]) | Minutes(60*_[3]) }
     | number r"days?" { Days(_[0]) }
+    | number r"days?" "and" fraction { Days(_[0]) | Hours(12*_[3]) }
     | number r"weeks?" { Weeks(_[0]) }
+    | number r"weeks?" "and" fraction { Weeks(_[0]+_[3]) }
     | number r"months?" { Months(_[0]) }
     | number r"years?" { Years(_[0]) }
+    | number r"years?" "and" fraction { Years(_[0]) | Months(12*_[3]) }
 
 number -> r"[0-9]+$" { int(_[0]) }
     | cardinal
     | some
+    | number "and" fraction { _[0] + _[2] }
 
 cardinal -> zero | small | hundreds | thousands
 zero -> "0" { 0 }
@@ -110,6 +141,15 @@ some -> couple
     | "a" couple { _[1] }
     | "few" { 3 }
     | "a" "few" { 3 }
+    | "a" { 1 }
+    | "an" { 1 }
 
 couple -> "couple" { 2 }
     | "couple" "of" { 2 }
+
+fraction -> "quarter" { Decimal("0.25") }
+    | "half" { Decimal("0.5") }
+    | "third" { 1/Decimal("3") }
+    | "two" "thirds" { 2/Decimal("3") }
+    | "three" "quarters" { Decimal("0.75") }
+    | "a" fraction { _[1] }

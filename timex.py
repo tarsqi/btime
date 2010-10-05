@@ -1,3 +1,4 @@
+from decimal import Decimal
 import re
 
 from cfg import *
@@ -21,7 +22,36 @@ class MonthNumberToken(RegexpTerminal):
     def match(self, token):
         m = super(MonthNumberToken, self).match(token)
         return m and 1 <= int(m.group(1)) <= 12
+
+class TemporalFunction(object):
+    def __call__(self, anchor):
+        raise ValueError("invalid temporal function")
 
+    def __str__(self):
+        return "%s()" % self.__class__.__name__.upper()
+
+class Now(TemporalFunction):
+    def __call__(self, anchor):
+        return anchor
+
+class AnchoredInterval(TemporalFunction):
+    def __init__(self, timex):
+        self.terminus = timex
+
+class PastAnchoredInterval(AnchoredInterval):
+    def __call__(self, anchor):
+        return anchor | self.terminus
+
+    def __str__(self):
+        return "PAST(%s)" % self.terminus
+
+class FutureAnchoredInterval(AnchoredInterval):
+    def __call__(self, anchor):
+        return self.terminus | anchor
+
+    def __str__(self):
+        return "NEXT(%s)" % self.terminus
+
 def read_grammar(filename="timex-grammar.txt"):
     with open(filename) as f:
         return parse_grammar_spec(f.readline, "timex", globals())
@@ -53,7 +83,8 @@ def sentences(s):
 
 def parse_sentence(sentence, grammar=read_grammar()):
     parser = Parser(grammar)
-    toks = sentence.replace("-", " ").split(" ")
+    toks = [word.lower().rstrip(".,;:!")
+            for word in sentence.replace("-", " ").split(" ")]
     while toks:
         parser.parse(toks)
         try:
