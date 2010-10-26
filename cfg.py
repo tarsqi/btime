@@ -39,9 +39,20 @@ class RegexpTerminal(Terminal):
     def __str__(self):
         return self.name
 
-class Acronym(RegexpTerminal):
+class Acronym(Terminal):
+    """Matches an acronym with or without periods between the initials.
+    The acronym itself may be specified either with or without periods."""
+
     def __init__(self, acronym):
-        super(Acronym, self).__init__(r"\.?".join(acronym + "$"), acronym)
+        if re.match(r"(\w\.)+$", acronym):
+            self.acronym = (acronym, "".join(acronym.split(".")))
+        elif re.match(r"\w+$", acronym):
+            self.acronym = (acronym, "".join(["%c." % c for c in acronym]))
+        else:
+            raise ValueError("invalid acronym: %s" % acronym)
+
+    def match(self, token):
+        return token in self.acronym
 
 class Abbrev(Terminal):
     def __init__(self, string, min_prefix_len):

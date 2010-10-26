@@ -30,9 +30,21 @@ class TestAcronym(TestCase):
         """Match an acronym with periods"""
         self.assertTrue(Acronym("ad").match("a.d."))
 
+    def test_specified_with_match_without(self):
+        """Match an acronym without periods, but specified with periods"""
+        self.assertTrue(Acronym("a.d.").match("ad"))
+
+    def test_specified_with_match_with(self):
+        """Match an acronym with periods that was specified with periods"""
+        self.assertTrue(Acronym("a.d.").match("a.d."))
+
     def test_mismatch(self):
         """Fail to match an acronym"""
         self.assertFalse(Acronym("ad").match("add"))
+
+    def test_invalid(self):
+        """Reject an invalid acronym"""
+        self.assertRaises(ValueError, lambda: Acronym("ad$"))
 
 class TestAbbrev(TestCase):
     def setUp(self):
