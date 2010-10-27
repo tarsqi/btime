@@ -29,8 +29,8 @@ class Literal(Terminal):
         return self.lit
 
 class RegexpTerminal(Terminal):
-    def __init__(self, pattern, name=None):
-        self.pattern = re.compile(pattern)
+    def __init__(self, pattern, name=None, flags=re.UNICODE):
+        self.pattern = re.compile(pattern, flags)
         self.name = name or pattern
 
     def match(self, token):
@@ -44,9 +44,9 @@ class Acronym(Terminal):
     The acronym itself may be specified either with or without periods."""
 
     def __init__(self, acronym):
-        if re.match(r"(\w\.)+$", acronym):
-            self.acronym = (acronym, "".join(acronym.split(".")))
-        elif re.match(r"\w+$", acronym):
+        if re.match(r"(\w\.)+$", acronym, re.UNICODE):
+            self.acronym = (acronym, u"".join(acronym.split(".")))
+        elif re.match(r"\w+$", acronym, re.UNICODE):
             self.acronym = (acronym, "".join(["%c." % c for c in acronym]))
         else:
             raise ValueError("invalid acronym: %s" % acronym)
