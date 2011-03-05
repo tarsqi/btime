@@ -72,7 +72,7 @@ class Parser(object):
             # It's not worth checking that i == len(self.chart); we'll just
             # assume it. If it's not, another IndexError will be raised.
             self.chart.append([])
-            self.state_cache.append({})
+            self.cache.append(set())
             return self.chart[i]
 
     def __len__(self):
@@ -80,28 +80,23 @@ class Parser(object):
 
     def complete(self, state, i):
         for prev in self[state.start][:]:
-            if not prev.complete and prev.next == state.rule.lhs and \
-               (prev.rule, prev.start, prev.dot+1) not in self.state_cache[i]:
+            if not prev.complete and prev.next == state.rule.lhs:
                 self.chart[i].append(prev.advance(state))
-                self.state_cache[i][(prev.rule, prev.start, prev.dot+1)] = True
 
     def predict(self, state, i):
         for rule in self.grammar[state.next]:
-            if (rule, i, 0) not in self.state_cache[i]:
+            if rule not in self.cache[i]:
                 self.chart[i].append(State(rule, i, 0))
-                self.state_cache[i][(rule, i, 0)] = True
+                self.cache[i].add(rule)
 
     def scan(self, state, i, token):
         if state.next.match(token):
             self[i+1] # touch and maybe extend
-            entry = (state.rule, state.start, state.dot+1)
-            if entry not in self.state_cache[i+1]:
-                self.chart[i+1].append(state.advance(token))
-                self.state_cache[i+1][entry] = True
+            self.chart[i+1].append(state.advance(token))
 
     def parse(self, input):
         self.chart = [[State(Production(self.start, self.grammar.start), 0)]]
-        self.state_cache = [{}]
+        self.cache = [set()]
 
         # We have n+1 state sets to process, so we tack on an extra dummy
         # token to the input.
