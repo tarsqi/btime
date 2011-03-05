@@ -43,6 +43,38 @@ class ParseExprTest(TestCase):
         self.assertEqual(parse_expr(["20", "+", "5"]), 25)
         self.assertEqual(parse_expr(["17", "*", "2"]), 34)
 
+# A simple but ambiguous grammar for trivial sentences.
+sentence_grammar = """
+S -> NP VP { _ }
+NP -> NP PP { _ }
+NP -> "John"
+NP -> "Sue"
+NP -> "Denver"
+VP -> V NP { _ }
+VP -> VP PP { _ }
+V -> "called"
+PP -> P NP { _ }
+P -> "from"
+"""
+def parse_sentence(sentence, grammar=parse_grammar_spec(sentence_grammar, "S")):
+    parser = Parser(grammar)
+    parser.parse(sentence.split(" "))
+    for parse in parser.parses():
+        yield parser.grammar.eval(parse)
+
+class ParseSentenceTest(TestCase):
+    def test_unambiguous_sentence(self):
+        """Parse an unambiguous sentence"""
+        self.assertEqual(list(parse_sentence("John called Sue")),
+                         [["John", ["called", "Sue"]]])
+
+    def test_ambiguous_sentence(self):
+        """Parse an ambiguous sentence"""
+        self.assertEqual(list(parse_sentence("John called Sue from Denver")),
+                         [["John", [["called", "Sue"], ["from", "Denver"]]],
+                          ["John", ["called", ["Sue", ["from", "Denver"]]]],
+                          ["John", ["called", "Sue"]]])
+
 # A rather larger grammer for English cardinals.
 number_grammar = """
 number -> zero | small | hundreds | thousands
@@ -158,6 +190,7 @@ def suite():
     return TestSuite([TestLoader().loadTestsFromTestCase(cls) \
                           for cls in (CompileActionTest,
                                       ParseExprTest,
+                                      ParseSentenceTest,
                                       ParseNumberTest)])
 
 def run(runner=TextTestRunner, **args):
