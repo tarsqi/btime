@@ -81,16 +81,22 @@ def sentences(s):
     if i < n and i < j:
         yield s[i:j]
 
-def parse_sentence(sentence, grammar=read_grammar()):
-    parser = Parser(grammar)
-    toks = [word.lower().rstrip(".,;:!")
+def tokenize(sentence):
+    """Produce a list of tokens from the given sentence (a string).
+
+    This implementation is dead simple, and is not meant for production use.
+    It assumes normalized input."""
+    return [word.lower().rstrip(".,;:!")
             for word in sentence.replace("-", " ").split(" ")]
-    while toks:
-        parser.parse(toks)
+
+def parse(tokens, grammar=read_grammar()):
+    tokens = list(tokens)
+    parser = Parser(grammar)
+    while tokens:
+        parser.parse(tokens)
         try:
             tree = parser.parses().next()
             yield parser.grammar.eval(tree)
-            del toks[0:len(list(tree.leaves()))]
+            del tokens[0:len(list(tree.leaves()))]
         except StopIteration:
-            yield toks.pop(0)
-
+            yield tokens.pop(0)
