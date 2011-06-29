@@ -22,7 +22,26 @@ class MonthNumberToken(RegexpTerminal):
     def match(self, token):
         m = super(MonthNumberToken, self).match(token)
         return m and 1 <= int(m.group(1)) <= 12
-
+
+class MMDDYYyyToken(RegexpTerminal):
+    def __init__(self):
+        super(MMDDYYyyToken, self).__init__(r"([0-9]{1,2}(/|-)" + \
+                                            "[0-9]{1,2}(/|-)" + \
+                                            "([0-9]{2}|[0-9]{4}))$",
+                                            "MMDDYYyy")
+
+    def match(self, token):
+        return super(MMDDYYyyToken, self).match(token)
+
+class MMDDToken(RegexpTerminal):
+    def __init__(self):
+        super(MMDDToken, self).__init__(r"([0-9]{1,2}(/|-)" + \
+                                        "[0-9]{1,2})$",
+                                        "MMDD")
+
+    def match(self, token):
+        return super(MMDDToken, self).match(token)
+            
 class TemporalFunction(object):
     def __call__(self, anchor):
         raise ValueError("invalid temporal function")
@@ -51,7 +70,7 @@ class FutureAnchoredInterval(AnchoredInterval):
 
     def __str__(self):
         return "NEXT(%s)" % self.terminus
-
+
 def read_grammar(filename="timex-grammar.txt"):
     with open(filename) as f:
         return parse_grammar_spec(f.readline, "timex", globals())
@@ -59,6 +78,14 @@ def read_grammar(filename="timex-grammar.txt"):
 def normalize_space(s):
     """Replace all runs of whitespace with a single space."""
     return " ".join(re.split(r"\s+", s))
+
+def mmddyyyy_to_date(token):
+    tokens = re.findall(r'\d+', token)
+    return CalendarDate(tokens[2], tokens[0], tokens[1])
+
+def mmdd_to_date(token):
+    tokens = re.findall(r'\d+', token)
+    return MonthDate(tokens[0], tokens[1])
 
 def sentences(s):
     """Given a string of English text with normalized spacing (i.e., exactly

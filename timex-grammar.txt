@@ -1,6 +1,15 @@
-timex -> present { Now() } | date | time | day_of_week | month | interval
+timex -> present { Now() } 
+    | date 
+    | time 
+    | day_of_week 
+    | month
+    | month_and_day
+    | interval
+    | year_and_week
+    | quarter
 
 present -> "now"
+    | "right" "now"
     | "today"
     | "this" "time"
     | "current" "time"
@@ -8,6 +17,7 @@ present -> "now"
     | "the" "current" "time"
     | "present"
     | "presently"
+    | "at" "present"
     | "present" "time"
     | "the" "present" "time"
 
@@ -15,6 +25,10 @@ time -> named_hour { Time(_[0]) }
     | hour ":" minute { Time(_[0], _[2]) }
     | minute r"past|after" hour { Time(_[2], _[0]) }
     | minute r"of|to|before|'?till" hour { Time(_[2]-1, 60-int(_[0])) }
+    | small r"a.m.?" { Time(_[0]) }
+    | small "in" "the" "morning" { Time(_[0]) }
+    | small r"p.m.?" { Time(int(_[0]) + 12) }
+    | small "in" "the" r"evening|afternoon" { Time(int(_[0]) + 12) }
 
 hour -> named_hour
     | small { Hour(_[0]) }
@@ -29,12 +43,13 @@ minute -> small { Minute(_[0]) }
 
 date -> day month year { CalendarDate(_[2], _[1], _[0]) }
     | month day year { CalendarDate(_[2], _[0], _[1]) }
+    | MMDDYYyyToken() { mmddyyyy_to_date(_[0]) }
+    | MMDDToken() { mmdd_to_date(_[0]) }
 
 day -> small { DayOfMonth(_[0]) }
     | DayOfMonthToken() { DayOfMonth(_[0]) }
 
-month -> MonthNumberToken() { Month(_[0]) }
-    | Abbrev("january", 3) { Month(1) }
+month -> Abbrev("january", 3) { Month(1) }
     | Abbrev("february", 3) { Month(2) }
     | Abbrev("march", 3) { Month(3) }
     | Abbrev("april", 3) { Month(4) }
@@ -46,8 +61,23 @@ month -> MonthNumberToken() { Month(_[0]) }
     | Abbrev("october", 3) { Month(10) }
     | Abbrev("november", 3) { Month(11) }
     | Abbrev("december", 3) { Month(12) }
+    
+quarter -> ordinal "quarter" { Quarter(_[0]) } 
+    | "the" ordinal "quarter" { Quarter(_[1]) } 
 
+month_and_day -> month day { Month(_[0]) | DayOfMonth(_[1]) }
+    | month ordinal { Month(_[0]) | DayOfMonth(_[1]) }
+    | day "of" month { Month(_[2]) | DayOfMonth(_[0])  }
+    | ordinal "of" month { Month(_[2]) | DayOfMonth(_[0]) }
+    | "the" ordinal "of" month { Month(_[3]) | DayOfMonth(_[1]) }
+    
 year -> cardinal | r"[0-9]{1,4}$" { Year(_[0]) }
+
+year_and_week -> ordinal "week" "of" year { Year(_[3]) | Week(_[0]) }
+    | "the" ordinal "week" "of" year { Year(_[4]) | Week(_[1]) }
+    
+year_and_day -> ordinal "day" "of" year { Year(_[3]) | Day(_[0]) }
+    | "the" ordinal "day" "of" year { Year(_[4]) | Day(_[1]) }
 
 day_of_week -> Abbrev("monday", 3) { DayOfWeek(1) }
     | Abbrev("tuesday", 3) { DayOfWeek(2) }
@@ -72,16 +102,16 @@ duration -> period { Duration() | _[0] }
 
 period -> number r"seconds?" { Seconds(_[0]) }
     | number r"minutes?" { Minutes(_[0]) }
-    | number r"minutes?" "and" fraction { Minutes(_[0]) | Seconds(60*_[3]) }
+    | number "and" fraction r"minutes?" { Minutes(_[0]) | Seconds(60*_[2]) }
     | number r"hours?" { Hours(_[0]) }
-    | number r"hours?" "and" fraction { Hours(_[0]) | Minutes(60*_[3]) }
+    | number "and" fraction r"hours?" { Hours(_[0]) | Minutes(60*_[2]) }
     | number r"days?" { Days(_[0]) }
-    | number r"days?" "and" fraction { Days(_[0]) | Hours(12*_[3]) }
+    | number "and" fraction r"days?" { Days(_[0]) | Hours(12*_[2]) }
     | number r"weeks?" { Weeks(_[0]) }
-    | number r"weeks?" "and" fraction { Weeks(_[0]+_[3]) }
     | number r"months?" { Months(_[0]) }
+    | number r"quarters?" { Quarters(_[0]) }
     | number r"years?" { Years(_[0]) }
-    | number r"years?" "and" fraction { Years(_[0]) | Months(12*_[3]) }
+    | number "and" fraction r"years?" { Years(_[0]) | Months(12*_[2]) }
 
 number -> r"[0-9]+$" { int(_[0]) }
     | cardinal
@@ -137,6 +167,40 @@ thousands -> small small { _[0] * 100 + _[1] }
     | hundreds "thousand" "and" small { (_[0] * 1000) + _[3] }
     | hundreds "thousand" hundreds { (_[0] * 1000) + _[2] }
 
+ordinal -> ord_ones | ord_small 
+ord_small -> r"[0-9]+(st|nd|rd|th)" { int(_[0][:-2]) }
+    | ord_ones
+    | ord_teen
+    | ord_tens
+    | tens ord_ones { _[0] + _[1] }
+ord_ones -> "first" { 1 }
+    | "second" { 2 }
+    | "third" { 3 }
+    | "fourth" { 4 }
+    | "fifth" { 5 }
+    | "sixth" { 6 }
+    | "seventh" { 7 }
+    | "eighth" { 8 }
+    | "ninth" { 9 }
+ord_teen -> "tenth" { 10 }
+    | "eleventh" { 11 }
+    | "twelfth" { 12 }
+    | "thirteenth" { 13 }
+    | "fourteenth" { 14 }
+    | "fifteenth" { 15 }
+    | "sixteenth" { 16 }
+    | "seventeenth" { 17 }
+    | "eighteenth" { 18 }
+    | "nineteenth" { 19 }
+ord_tens -> "twentieth" { 20 }
+    | "thirtieth" { 30 }
+    | "fortieth" { 40 }
+    | "fiftieth" { 50 }
+    | "sixtieth" { 60 }
+    | "seventieth" { 70 }
+    | "eightieth" { 80 }
+    | "ninetieth" { 90 }
+
 some -> couple
     | "a" couple { _[1] }
     | "few" { 3 }
@@ -146,6 +210,14 @@ some -> couple
 
 couple -> "couple" { 2 }
     | "couple" "of" { 2 }
+
+quant -> "each" { _[0] }
+    | "every" { _[0] }
+    | "some" { _[0] }
+
+freq -> "once" { 1 }
+    | "twice" { 2 }
+    | number "times" { _[0] }    
 
 fraction -> "quarter" { Decimal("0.25") }
     | "half" { Decimal("0.5") }
