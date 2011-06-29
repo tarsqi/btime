@@ -1,14 +1,19 @@
 timex -> present { Now() } 
-    | date 
-    | time 
-    | day_of_week 
-    | month
-    | month_and_day
+    | indef_past { IndefPast() }
+	| indef_future { IndefFuture() }
+	| indef_duration { Duration() }
+    | timepoint
     | interval
-    | year_and_week
-    | quarter
     | mod
     | quant
+    
+timepoint -> date
+    | time
+    | day_of_week
+    | month
+    | month_and_day
+    | year_and_week
+    | quarter
 
 present -> "now"
     | "right" "now"
@@ -98,6 +103,7 @@ anchored_interval -> "past" duration { PastAnchoredInterval(_[1]) }
     | "the" anchored_interval { _[1] }
 
 duration -> period { Duration() | _[0] }
+    | bare_unit { Duration() | _[0] }
     | duration period { _[0] | _[1] }
     | duration "and" period { _[0] | _[2] }
     | duration "period"
@@ -114,7 +120,16 @@ period -> number r"seconds?" { Seconds(_[0]) }
     | number r"quarters?" { Quarters(_[0]) }
     | number r"years?" { Years(_[0]) }
     | number "and" fraction r"years?" { Years(_[0]) | Months(12*_[2]) }
-
+    
+bare_unit -> "second" { Seconds(1) }
+    | "minute" { Minutes(1) }
+    | "hour" { Hours(1) }
+    | "day" { Days(1) }
+    | "week" { Weeks(1) }
+    | "month" { Months(1) }
+    | "quarter" { Quarters(1) }
+    | "year" { Years(1) }
+    
 number -> r"[0-9]+$" { int(_[0]) }
     | cardinal
     | number "and" fraction { _[0] + _[2] }
@@ -129,6 +144,7 @@ small -> r"[0-9]{1,2}$" { int(_[0]) }
     | tens
     | tens ones { _[0] + _[1] }
 ones -> "one" { 1 }
+    | r"^an?$" { 1 }
     | "two" { 2 }
     | "three" { 3 }
     | "four" { 4 }
@@ -210,7 +226,8 @@ mod -> approx duration { Mod("APPROX", _[1]) }
     | duration "or" "more" { Mod("EQUAL_OR_MORE", _[0]) } 
     | less_than duration { Mod("LESS_THAN", _[1]) }
     | more_than duration { Mod("MORE_THAN", _[1]) }
-    | end duration { Mod("END", _[1]) } 
+    | start timepoint { Mod("START", _[1]) }
+    | end timepoint { Mod("END", _[1]) } 
 
 approx -> "a" "couple"
     | "a" "couple" "of"
@@ -224,9 +241,11 @@ equal_or_less -> "nearly"
     | "at" "most"
     | "up" "to"
     | "no" "more" "than"
+    | "as" "much" "as"
 
 equal_or_more -> "at" "least"
     | "no" "less" "than"
+    | "as" "little" "as"
 
 less_than -> "less" "than" 
     | "almost"
@@ -245,11 +264,7 @@ start -> "early"
     | "the" "start" "of"
     | "the" "beginning" "of"
 
-quant -> quantifier day_of_week { Quant(_[0], _[1]) }
-    | quantifier month { Quant(_[0], _[1]) }
-    | quantifier month_and_day { Quant(_[0], _[1]) }
-    | quantifier interval { Quant(_[0], _[1]) }
-    | quantifier quarter { Quant(_[0], _[1]) }
+quant -> quantifier duration { Quant(_[0], _[1]) }
 
 quantifier -> "each" { _[0] }
     | "every" { _[0] }
@@ -264,7 +279,36 @@ fraction -> "quarter" { Decimal("0.25") }
     | "two" "thirds" { 2/Decimal("3") }
     | "three" "quarters" { Decimal("0.75") }
     | "a" fraction { _[1] }
+    
+some -> "some"
+    | "many"
+    
+indef_past -> "recently"
+    | "a" "while" "ago"
+    | r"^an?" adj_phrase "while" "ago"
+    | r"^an?" adj_phrase "time" "ago"
+    | dt adj_phrase "past"
+    | dt "past"
+    | "past"
+
+indef_future -> "soon"
+    | dt adj_phrase "future"
+    | dt "future"
+    
+indef_duration -> dt "time"
+    | dt adj_phrase "time"
+    | "a" "while"
+    | r"^an?" adj_phrase "while"
+    | dt "period"
+    | dt adj_phrase "period"
+    
+adj_phrase -> adj
+    | adj_phrase adj
+    | adj adj_phrase
+    | adv adj
 
 adj -> "/jj"
+adv -> "/rb"
+    | "very"
 dt -> "/dt"
 modal -> "/md"

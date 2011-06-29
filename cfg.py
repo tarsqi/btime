@@ -206,7 +206,8 @@ class ParseTree(object):
 def token_word(token):
     match = re.match(input_regexp, token)
     if match: return match.group(1)
-    else: return None
+    else: return token # allows things to (mostly) still work for
+                       # untagged tokens
 
 def token_pos(token):
     match = re.match(input_regexp, token)

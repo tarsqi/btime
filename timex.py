@@ -70,7 +70,7 @@ class PastAnchoredInterval(AnchoredInterval):
         return anchor | self.duration
 
     def __str__(self):
-        return "PAST(%s)" % self.duration
+        return "LAST(%s)" % self.duration
 
 class FutureAnchoredInterval(AnchoredInterval):
     def __call__(self, anchor):
@@ -78,6 +78,16 @@ class FutureAnchoredInterval(AnchoredInterval):
 
     def __str__(self):
         return "NEXT(%s)" % self.duration
+
+class IndefReference(TemporalFunction): pass
+
+class IndefPast(IndefReference): 
+    def __str__(self):
+        return "INDEF_PAST"
+
+class IndefFuture(IndefReference): 
+    def __str__(self):
+        return "INDEF_FUTURE"
 
 class TemporalModifier(object):
     def __init__(self, modifier, timex):
