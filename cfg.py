@@ -7,6 +7,11 @@ import re
 import sys
 from types import FunctionType
 
+# Russell 6-29: These classes all expect "word/POS" tokens as their input
+# for matching purposes. Make this look nicer later?
+
+input_regexp = r'^(.+)/([^/]+)$'
+
 class Terminal(object):
     """Terminal objects are used to match input tokens. Subclasses should
     override the match method, which takes a token and returns true if that
@@ -20,7 +25,7 @@ class Literal(Terminal):
         self.lit = unicode(lit)
 
     def match(self, token):
-        return self.lit == unicode(token)
+        return self.lit == unicode(token_word(token))
 
     def __repr__(self):
         return "Literal(%r)" % self.lit
@@ -28,13 +33,27 @@ class Literal(Terminal):
     def __str__(self):
         return self.lit
 
+class POSTerminal(Terminal):
+    def __init__(self, pos):
+        self.pos = unicode(pos[1:])
+
+    def match(self, token):
+        return self.pos == unicode(token_pos(token))
+
+    def __repr__(self):
+        return "PartOfSpeech(%r)" % self.pos
+
+    def __str__(self):
+        return self.pos
+
 class RegexpTerminal(Terminal):
     def __init__(self, pattern, name=None, flags=re.UNICODE):
         self.pattern = re.compile(pattern, flags)
         self.name = name or pattern
 
     def match(self, token):
-        return token is not None and self.pattern.match(unicode(token))
+        return token is not None and \
+               self.pattern.match(unicode(token_word(token)))
 
     def __str__(self):
         return self.name
@@ -52,7 +71,7 @@ class Acronym(Terminal):
             raise ValueError("invalid acronym: %s" % acronym)
 
     def match(self, token):
-        return token in self.acronym
+        return token_word(token) in self.acronym
 
 class Abbrev(Terminal):
     def __init__(self, string, min_prefix_len):
@@ -65,7 +84,7 @@ class Abbrev(Terminal):
     def match(self, token):
         if token is None:
             return False
-        string = unicode(token)
+        string = unicode(token_word(token))
         return (len(string) >= self.min and
                 self.string.startswith(string.rstrip(".")))
 
@@ -168,3 +187,13 @@ class ParseTree(object):
         return (isinstance(other, ParseTree) and
                 self.node == other.node and
                 self.children == other.children)
+
+def token_word(token):
+    match = re.match(input_regexp, token)
+    if match: return match.group(1)
+    else: return None
+
+def token_pos(token):
+    match = re.match(input_regexp, token)
+    if match: return match.group(2)
+    else: return None

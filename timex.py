@@ -62,22 +62,22 @@ class Now(TemporalFunction):
         return anchor
 
 class AnchoredInterval(TemporalFunction):
-    def __init__(self, timex):
-        self.terminus = timex
+    def __init__(self, duration):
+        self.duration = duration
 
 class PastAnchoredInterval(AnchoredInterval):
     def __call__(self, anchor):
-        return anchor | self.terminus
+        return anchor | self.duration
 
     def __str__(self):
-        return "PAST(%s)" % self.terminus
+        return "PAST(%s)" % self.duration
 
 class FutureAnchoredInterval(AnchoredInterval):
     def __call__(self, anchor):
-        return self.terminus | anchor
+        return self.duration | anchor
 
     def __str__(self):
-        return "NEXT(%s)" % self.terminus
+        return "NEXT(%s)" % self.duration
 
 class TemporalModifier(object):
     def __init__(self, modifier, timex):

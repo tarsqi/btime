@@ -264,3 +264,6 @@ fraction -> "quarter" { Decimal("0.25") }
     | "two" "thirds" { 2/Decimal("3") }
     | "three" "quarters" { Decimal("0.75") }
     | "a" fraction { _[1] }
+
+adj -> "/jj"
+dt -> "/dt"
