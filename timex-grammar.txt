@@ -7,6 +7,7 @@ timex -> present { Now() }
     | interval
     | year_and_week
     | quarter
+    | mod
 
 present -> "now"
     | "right" "now"
@@ -115,7 +116,6 @@ period -> number r"seconds?" { Seconds(_[0]) }
 
 number -> r"[0-9]+$" { int(_[0]) }
     | cardinal
-    | some
     | number "and" fraction { _[0] + _[2] }
 
 cardinal -> zero | small | hundreds | thousands
@@ -201,15 +201,47 @@ ord_tens -> "twentieth" { 20 }
     | "eightieth" { 80 }
     | "ninetieth" { 90 }
 
-some -> couple
-    | "a" couple { _[1] }
-    | "few" { 3 }
-    | "a" "few" { 3 }
-    | "a" { 1 }
-    | "an" { 1 }
+mod -> approx duration { Mod("APPROX", _[1]) }
+    | equal_or_less duration { Mod("EQUAL_OR_LESS", _[1]) } 
+    | duration "or" "less" { Mod("EQUAL_OR_LESS", _[0]) } 
+    | equal_or_more duration { Mod("EQUAL_OR_MORE", _[1]) } 
+    | duration "or" "more" { Mod("EQUAL_OR_MORE", _[0]) } 
+    | less_than duration { Mod("LESS_THAN", _[1]) }
+    | more_than duration { Mod("MORE_THAN", _[1]) }
+    | end duration { Mod("END", _[1]) } 
 
-couple -> "couple" { 2 }
-    | "couple" "of" { 2 }
+approx -> "a" "couple"
+    | "a" "couple" "of"
+    | "few" 
+    | "a" "few"
+    | "about"
+    | "around"
+
+equal_or_less -> "nearly"
+    | "approaching"
+    | "at" "most"
+    | "up" "to"
+    | "no" "more" "than"
+
+equal_or_more -> "at" "least"
+    | "no" "less" "than"
+
+less_than -> "less" "than" 
+    | "almost"
+
+more_than -> "more" "than"
+    | "over"
+
+end -> "late"
+    | "later"
+    | "the" "late"
+    | "the" "end" "of"
+   
+start -> "early"
+    | "earlier"
+    | "the" "early"
+    | "the" "start" "of"
+    | "the" "beginning" "of"
 
 quant -> "each" { _[0] }
     | "every" { _[0] }

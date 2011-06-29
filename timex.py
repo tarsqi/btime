@@ -41,6 +41,14 @@ class MMDDToken(RegexpTerminal):
 
     def match(self, token):
         return super(MMDDToken, self).match(token)
+
+class MidToken(RegexpTerminal):
+    def __init__(self):
+        super(MMDDToken, self).__init__(r"^mid-.*$",
+                                        "mid-")
+
+    def match(self, token):
+        return super(MMDDToken, self).match(token)
             
 class TemporalFunction(object):
     def __call__(self, anchor):
@@ -70,6 +78,14 @@ class FutureAnchoredInterval(AnchoredInterval):
 
     def __str__(self):
         return "NEXT(%s)" % self.terminus
+
+class Mod(object):
+    def __init__(self, mod_type, timex):
+        self.mod_type = mod_type
+        self.timex = timex
+
+    def __str__(self):
+        return "%s(%s)" % (self.mod_type, self.timex)
 
 def read_grammar(filename="timex-grammar.txt"):
     with open(filename) as f:
