@@ -54,7 +54,7 @@ month -> Abbrev("january", 3) { Month(1) }
     | Abbrev("february", 3) { Month(2) }
     | Abbrev("march", 3) { Month(3) }
     | Abbrev("april", 3) { Month(4) }
-    | "may" { Month(5) }
+    | WordNotPOS("may", "md") { Month(5) }
     | Abbrev("june", 3) { Month(6) }
     | Abbrev("july", 3) { Month(7) }
     | Abbrev("august", 3) { Month(8) }
@@ -267,3 +267,4 @@ fraction -> "quarter" { Decimal("0.25") }
 
 adj -> "/jj"
 dt -> "/dt"
+modal -> "/md"

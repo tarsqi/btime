@@ -88,6 +88,21 @@ class Abbrev(Terminal):
         return (len(string) >= self.min and
                 self.string.startswith(string.rstrip(".")))
 
+class WordPOSTerminal(Terminal):
+    def __init__(self, word, pos):
+        self.word = word
+        self.pos = pos
+
+class WordAndPOS(WordPOSTerminal):
+    def match(self, token):
+        return token and self.word == unicode(token_word(token)) and \
+                         self.pos == unicode(token_pos(token))
+
+class WordNotPOS(WordPOSTerminal):
+    def match(self, token):
+        return token and self.word == unicode(token_word(token)) and \
+                         not self.pos == unicode(token_pos(token))
+
 class Production(object):
     """A production rule consists of a left-hand side (LHS) and a
     right-hand side (RHS). A context-free production will have a single
