@@ -79,13 +79,17 @@ class FutureAnchoredInterval(AnchoredInterval):
     def __str__(self):
         return "NEXT(%s)" % self.terminus
 
-class Mod(object):
-    def __init__(self, mod_type, timex):
-        self.mod_type = mod_type
+class TemporalModifier(object):
+    def __init__(self, modifier, timex):
+        self.modifier = modifier
         self.timex = timex
 
     def __str__(self):
-        return "%s(%s)" % (self.mod_type, self.timex)
+        return "%s(%s)" % (self.modifier, self.timex)
+
+class Mod(TemporalModifier): pass
+class Freq(TemporalModifier): pass
+class Quant(TemporalModifier): pass
 
 def read_grammar(filename="timex-grammar.txt"):
     with open(filename) as f:

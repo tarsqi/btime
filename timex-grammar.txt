@@ -8,6 +8,7 @@ timex -> present { Now() }
     | year_and_week
     | quarter
     | mod
+    | quant
 
 present -> "now"
     | "right" "now"
@@ -45,7 +46,6 @@ minute -> small { Minute(_[0]) }
 date -> day month year { CalendarDate(_[2], _[1], _[0]) }
     | month day year { CalendarDate(_[2], _[0], _[1]) }
     | MMDDYYyyToken() { mmddyyyy_to_date(_[0]) }
-    | MMDDToken() { mmdd_to_date(_[0]) }
 
 day -> small { DayOfMonth(_[0]) }
     | DayOfMonthToken() { DayOfMonth(_[0]) }
@@ -71,6 +71,7 @@ month_and_day -> month day { Month(_[0]) | DayOfMonth(_[1]) }
     | day "of" month { Month(_[2]) | DayOfMonth(_[0])  }
     | ordinal "of" month { Month(_[2]) | DayOfMonth(_[0]) }
     | "the" ordinal "of" month { Month(_[3]) | DayOfMonth(_[1]) }
+    | MMDDToken() { mmdd_to_date(_[0]) }
     
 year -> cardinal | r"[0-9]{1,4}$" { Year(_[0]) }
 
@@ -202,6 +203,7 @@ ord_tens -> "twentieth" { 20 }
     | "ninetieth" { 90 }
 
 mod -> approx duration { Mod("APPROX", _[1]) }
+    | duration "or" "so" { Mod("APPROX", _[0]) }
     | equal_or_less duration { Mod("EQUAL_OR_LESS", _[1]) } 
     | duration "or" "less" { Mod("EQUAL_OR_LESS", _[0]) } 
     | equal_or_more duration { Mod("EQUAL_OR_MORE", _[1]) } 
@@ -243,9 +245,14 @@ start -> "early"
     | "the" "start" "of"
     | "the" "beginning" "of"
 
-quant -> "each" { _[0] }
+quant -> quantifier day_of_week { Quant(_[0], _[1]) }
+    | quantifier month { Quant(_[0], _[1]) }
+    | quantifier month_and_day { Quant(_[0], _[1]) }
+    | quantifier interval { Quant(_[0], _[1]) }
+    | quantifier quarter { Quant(_[0], _[1]) }
+
+quantifier -> "each" { _[0] }
     | "every" { _[0] }
-    | "some" { _[0] }
 
 freq -> "once" { 1 }
     | "twice" { 2 }
