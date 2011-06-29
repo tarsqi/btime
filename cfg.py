@@ -25,7 +25,7 @@ class Literal(Terminal):
         self.lit = unicode(lit)
 
     def match(self, token):
-        return self.lit == unicode(token_word(token))
+        return token and self.lit == unicode(token_word(token))
 
     def __repr__(self):
         return "Literal(%r)" % self.lit
@@ -38,7 +38,7 @@ class POSTerminal(Terminal):
         self.pos = unicode(pos[1:])
 
     def match(self, token):
-        return self.pos == unicode(token_pos(token))
+        return token and self.pos == unicode(token_pos(token))
 
     def __repr__(self):
         return "PartOfSpeech(%r)" % self.pos
