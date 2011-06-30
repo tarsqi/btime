@@ -167,6 +167,12 @@ def mmdd_to_date(token):
     tokens = re.findall(r'\d+', token)
     return MonthDate(tokens[0], tokens[1])
 
+def yyyymmdd_to_date(token):
+    return CalendarDate(token[:4], token[4:6], token[6:])
+
+def yymmdd_to_date(token):
+    return CalendarDate(token[:2], token[2:4], token[4:])
+
 def sentences(s):
     """Given a string of English text with normalized spacing (i.e., exactly
     one space between words), yield sentences of that string, one at a time."""

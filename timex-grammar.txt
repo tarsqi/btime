@@ -12,6 +12,7 @@ timex -> present { Identity() }
 timepoint -> date
     | time
     | day_of_week
+    | year
     | month
     | month_and_day
     | year_and_week
@@ -23,6 +24,7 @@ present -> "now"
     | "this" "time"
     | "current" "time"
     | "currently"
+    | "current"
     | "the" "current" "time"
     | "present"
     | "presently"
@@ -44,7 +46,7 @@ coerced_exp -> "today" { CoercedTimePoint(Identity(), Day) }
 
 last -> "last" | "latest" | "most" "recent" | dt last
 
-next -> "next" | "following" | dt next
+next -> "next" | "following" | "coming" | dt next
 
 time -> named_hour { Time(_[0]) }
     | hour ":" minute { Time(_[0], _[2]) }
@@ -69,6 +71,8 @@ minute -> small { Minute(_[0]) }
 date -> day month year { CalendarDate(_[2], _[1], _[0]) }
     | month day year { CalendarDate(_[2], _[0], _[1]) }
     | MMDDYYyyToken() { mmddyyyy_to_date(_[0]) }
+    | r"^(19|20)\d{6}$" { yyyymmdd_to_date(_[0]) }
+    | r"^\d{6}$" { yymmdd_to_date(_[0]) }
 
 day -> small { DayOfMonth(_[0]) }
     | DayOfMonthToken() { DayOfMonth(_[0]) }
@@ -96,7 +100,8 @@ month_and_day -> month day { Month(_[0]) | DayOfMonth(_[1]) }
     | "the" ordinal "of" month { Month(_[3]) | DayOfMonth(_[1]) }
     | MMDDToken() { mmdd_to_date(_[0]) }
     
-year -> cardinal | r"[0-9]{1,4}$" { Year(_[0]) }
+year -> cardinal | r"^(19|20)\d{2}$" { Year(_[0]) }
+    | "the" "year" year { _[2] }
 
 year_and_week -> ordinal "week" "of" year { Year(_[3]) | Week(_[0]) }
     | "the" ordinal "week" "of" year { Year(_[4]) | Week(_[1]) }
@@ -130,7 +135,8 @@ duration -> period { Duration() | _[0] }
     | bare_unit { Duration() | _[0](1) }
     | duration period { _[0] | _[1] }
     | duration "and" period { _[0] | _[2] }
-    | duration "period"
+    | duration "period" { _[0] }
+    | "the" duration { _[1] }
 
 period -> number r"seconds?" { Seconds(_[0]) }
     | number r"minutes?" { Minutes(_[0]) }
@@ -321,9 +327,6 @@ fraction -> "quarter" { Decimal("0.25") }
     | "three" "quarters" { Decimal("0.75") }
     | "a" fraction { _[1] }
     
-some -> "some"
-    | "many"
-    
 indef_past -> "recent"
     | adv "recent"
     | "recently"
@@ -361,6 +364,11 @@ adj_phrase -> adj
     | adj adj_phrase
     | adv adj
 
+few -> "few"
+    | "couple"
+    | "couple" "of"
+    | "several"
+
 adj -> "/jj"
 adv -> "/rb"
     | "very"
@@ -369,4 +377,7 @@ adv -> "/rb"
     | "more"
     | "less"
 dt -> "/dt"
+    | "a"
+    | "an"
+    | "the"
 modal -> "/md"
