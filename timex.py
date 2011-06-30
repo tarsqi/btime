@@ -49,6 +49,9 @@ class MidToken(RegexpTerminal):
 
     def match(self, token):
         return super(MMDDToken, self).match(token)
+
+class Any(Terminal):
+    def match(self, token): return True
             
 class TemporalFunction(object):
     def __call__(self, anchor):
@@ -89,17 +92,36 @@ class IndefFuture(IndefReference):
     def __str__(self):
         return "INDEF_FUTURE"
 
+class AnchoredTimePoint(TemporalFunction):
+    def __init__(self, duration):
+        self.duration = duration
+
+class PastAnchoredTimePoint(AnchoredTimePoint):
+    def __str__(self):
+        return "(%s)AGO" % self.duration
+
+class FutureAnchoredTimePoint(AnchoredTimePoint):
+    def __str__(self):
+        return "(%s)LATER" % self.duration
+
+class CoercedAnchoredInterval(AnchoredInterval): pass
+
 class TemporalModifier(object):
     def __init__(self, modifier, timex):
         self.modifier = modifier
         self.timex = timex
 
     def __str__(self):
-        return "%s(%s)" % (self.modifier, self.timex)
+        return "%s(%s)" % (self.modifier.upper(), self.timex)
 
 class Mod(TemporalModifier): pass
+
 class Freq(TemporalModifier): pass
-class Quant(TemporalModifier): pass
+
+class Quant(TemporalModifier):
+    def __init__(self, modifier, timex):
+        self.modifier = token_word(modifier)
+        self.timex = timex
 
 def read_grammar(filename="timex-grammar.txt"):
     with open(filename) as f:

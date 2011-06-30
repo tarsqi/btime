@@ -14,6 +14,7 @@ timepoint -> date
     | month_and_day
     | year_and_week
     | quarter
+    | anchored_time_point
 
 present -> "now"
     | "right" "now"
@@ -101,6 +102,14 @@ anchored_interval -> "past" duration { PastAnchoredInterval(_[1]) }
     | "next" duration { FutureAnchoredInterval(_[2]) }
     | "coming" duration { FutureAnchoredInterval(_[2]) }
     | "the" anchored_interval { _[1] }
+    
+anchored_time_point -> duration "ago" { PastAnchoredTimePoint(_[0]) }
+    | duration "before" { PastAnchoredTimePoint(_[0]) }
+    | duration "after" { FutureAnchoredTimePoint(_[0]) }
+    | duration "since" { FutureAnchoredTimePoint(_[0]) }
+    | duration "hence" { FutureAnchoredTimePoint(_[0]) }
+    | duration "afterwards" { FutureAnchoredTimePoint(_[0]) }
+    | duration "later" { FutureAnchoredTimePoint(_[0]) }
 
 duration -> period { Duration() | _[0] }
     | bare_unit { Duration() | _[0] }
@@ -218,16 +227,16 @@ ord_tens -> "twentieth" { 20 }
     | "eightieth" { 80 }
     | "ninetieth" { 90 }
 
-mod -> approx duration { Mod("APPROX", _[1]) }
-    | duration "or" "so" { Mod("APPROX", _[0]) }
-    | equal_or_less duration { Mod("EQUAL_OR_LESS", _[1]) } 
-    | duration "or" "less" { Mod("EQUAL_OR_LESS", _[0]) } 
-    | equal_or_more duration { Mod("EQUAL_OR_MORE", _[1]) } 
-    | duration "or" "more" { Mod("EQUAL_OR_MORE", _[0]) } 
-    | less_than duration { Mod("LESS_THAN", _[1]) }
-    | more_than duration { Mod("MORE_THAN", _[1]) }
-    | start timepoint { Mod("START", _[1]) }
-    | end timepoint { Mod("END", _[1]) } 
+mod -> approx timex { Mod("APPROX", _[1]) }
+    | timex "or" "so" { Mod("APPROX", _[0]) }
+    | equal_or_less timex { Mod("EQUAL_OR_LESS", _[1]) } 
+    | timex "or" "less" { Mod("EQUAL_OR_LESS", _[0]) } 
+    | equal_or_more timex { Mod("EQUAL_OR_MORE", _[1]) } 
+    | timex "or" "more" { Mod("EQUAL_OR_MORE", _[0]) } 
+    | less_than timex { Mod("LESS_THAN", _[1]) }
+    | more_than timex { Mod("MORE_THAN", _[1]) }
+    | start timex { Mod("START", _[1]) }
+    | end timex { Mod("END", _[1]) } 
 
 approx -> "a" "couple"
     | "a" "couple" "of"
@@ -265,6 +274,7 @@ start -> "early"
     | "the" "beginning" "of"
 
 quant -> quantifier duration { Quant(_[0], _[1]) }
+    | quantifier Any() duration { Quant(_[0], _[2]) }
 
 quantifier -> "each" { _[0] }
     | "every" { _[0] }
@@ -284,23 +294,26 @@ some -> "some"
     | "many"
     
 indef_past -> "recently"
+    | adv "recently"
     | "a" "while" "ago"
     | r"^an?" adj_phrase "while" "ago"
     | r"^an?" adj_phrase "time" "ago"
     | dt adj_phrase "past"
     | dt "past"
     | "past"
+    | "last" "time"
+    | "the" "last" "time"
 
 indef_future -> "soon"
-    | dt adj_phrase "future"
+    | dt Any() "future"
     | dt "future"
+    | "next" "time"
+    | dt "next" "time"
     
 indef_duration -> dt "time"
-    | dt adj_phrase "time"
     | "a" "while"
-    | r"^an?" adj_phrase "while"
+    | r"^an?" Any() "while"
     | dt "period"
-    | dt adj_phrase "period"
     
 adj_phrase -> adj
     | adj_phrase adj
@@ -310,5 +323,9 @@ adj_phrase -> adj
 adj -> "/jj"
 adv -> "/rb"
     | "very"
+    | "most"
+    | "least"
+    | "more"
+    | "less"
 dt -> "/dt"
 modal -> "/md"
