@@ -1,11 +1,13 @@
-timex -> present { Now() } 
+timex -> present { Identity() } 
     | indef_past { IndefPast() }
 	| indef_future { IndefFuture() }
 	| indef_duration { Duration() }
+	| coerced_exp
     | timepoint
     | interval
     | mod
     | quant
+    | freq
     
 timepoint -> date
     | time
@@ -18,16 +20,31 @@ timepoint -> date
 
 present -> "now"
     | "right" "now"
-    | "today"
     | "this" "time"
     | "current" "time"
     | "currently"
     | "the" "current" "time"
     | "present"
     | "presently"
-    | "at" "present"
     | "present" "time"
     | "the" "present" "time"
+    | "meanwhile"
+    
+coerced_exp -> "today" { CoercedTimePoint(Identity(), Day) }
+    | "this" bare_unit { CoercedTimePoint(Identity(), _[1]) }
+    | "the" "current" bare_unit { CoercedTimePoint(Identity(), _[2]) }
+    | last "week" { PastAnchoredTimePoint(Duration() | Weeks(1))(CoercedTimePoint(Identity(), Week)) }
+    | last "month" { PastAnchoredTimePoint(Duration() | Months(1))(CoercedTimePoint(Identity(), Month)) }
+    | last "year" { PastAnchoredTimePoint(Duration() | Years(1))(CoercedTimePoint(Identity(), Year)) }
+    | next "week" { FutureAnchoredTimePoint(Duration() | Weeks(1))(CoercedTimePoint(Identity(), Week)) }
+    | next "month" { FutureAnchoredTimePoint(Duration() | Months(1))(CoercedTimePoint(Identity(), Month)) }
+    | next "year" { FutureAnchoredTimePoint(Duration() | Years(1))(CoercedTimePoint(Identity(), Year)) }
+    | "yesterday" { PastAnchoredTimePoint(Duration() | Days(1))(CoercedTimePoint(Identity(), Day)) }
+    | "tomorrow" { FutureAnchoredTimePoint(Duration() | Days(1))(CoercedTimePoint(Identity(), Day)) }
+
+last -> "last" | "latest" | "most" "recent" | dt last
+
+next -> "next" | "following" | dt next
 
 time -> named_hour { Time(_[0]) }
     | hour ":" minute { Time(_[0], _[2]) }
@@ -104,15 +121,13 @@ anchored_interval -> "past" duration { PastAnchoredInterval(_[1]) }
     | "the" anchored_interval { _[1] }
     
 anchored_time_point -> duration "ago" { PastAnchoredTimePoint(_[0]) }
-    | duration "before" { PastAnchoredTimePoint(_[0]) }
-    | duration "after" { FutureAnchoredTimePoint(_[0]) }
-    | duration "since" { FutureAnchoredTimePoint(_[0]) }
+    | duration "earlier" { PastAnchoredTimePoint(_[0]) }
     | duration "hence" { FutureAnchoredTimePoint(_[0]) }
     | duration "afterwards" { FutureAnchoredTimePoint(_[0]) }
     | duration "later" { FutureAnchoredTimePoint(_[0]) }
 
 duration -> period { Duration() | _[0] }
-    | bare_unit { Duration() | _[0] }
+    | bare_unit { Duration() | _[0](1) }
     | duration period { _[0] | _[1] }
     | duration "and" period { _[0] | _[2] }
     | duration "period"
@@ -130,14 +145,23 @@ period -> number r"seconds?" { Seconds(_[0]) }
     | number r"years?" { Years(_[0]) }
     | number "and" fraction r"years?" { Years(_[0]) | Months(12*_[2]) }
     
-bare_unit -> "second" { Seconds(1) }
-    | "minute" { Minutes(1) }
-    | "hour" { Hours(1) }
-    | "day" { Days(1) }
-    | "week" { Weeks(1) }
-    | "month" { Months(1) }
-    | "quarter" { Quarters(1) }
-    | "year" { Years(1) }
+bare_unit -> "second" { Seconds }
+    | "minute" { Minutes }
+    | "hour" { Hours }
+    | "day" { Days }
+    | "week" { Weeks }
+    | "month" { Months }
+    | "quarter" { Quarters }
+    | "year" { Years }
+
+plural_unit -> "seconds" { Seconds }
+    | "minutes" { Minutes }
+    | "hours" { Hours }
+    | "days" { Days }
+    | "weeks" { Weeks }
+    | "months" { Months }
+    | "quarters" { Quarters }
+    | "years" { Years }
     
 number -> r"[0-9]+$" { int(_[0]) }
     | cardinal
@@ -275,12 +299,19 @@ start -> "early"
 
 quant -> quantifier duration { Quant(_[0], _[1]) }
     | quantifier Any() duration { Quant(_[0], _[2]) }
+    | quantifier timepoint { Quant(_[0], _[1]) }
+    | quantifier Any() timepoint { Quant(_[0], _[2]) }
 
 quantifier -> "each" { _[0] }
     | "every" { _[0] }
 
-freq -> "once" { 1 }
+freq -> frequency duration { Freq(_[0], _[1]) }
+    | frequency "per" duration { Freq(_[0], _[2]) }
+    | frequency quant { Freq(_[0], _[1]) }
+
+frequency -> "once" { 1 }
     | "twice" { 2 }
+    | "thrice" { 3 }
     | number "times" { _[0] }    
 
 fraction -> "quarter" { Decimal("0.25") }
@@ -293,8 +324,16 @@ fraction -> "quarter" { Decimal("0.25") }
 some -> "some"
     | "many"
     
-indef_past -> "recently"
+indef_past -> "recent"
+    | adv "recent"
+    | "recently"
     | adv "recently"
+    | "previous"
+    | "previously"
+    | "earlier"
+    | "recent" plural_unit
+    | "previous" plural_unit
+    | "past" plural_unit
     | "a" "while" "ago"
     | r"^an?" adj_phrase "while" "ago"
     | r"^an?" adj_phrase "time" "ago"
@@ -309,6 +348,8 @@ indef_future -> "soon"
     | dt "future"
     | "next" "time"
     | dt "next" "time"
+    | "later"
+    | adv "later"
     
 indef_duration -> dt "time"
     | "a" "while"

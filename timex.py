@@ -60,27 +60,32 @@ class TemporalFunction(object):
     def __str__(self):
         return "%s()" % self.__class__.__name__.upper()
 
-class Now(TemporalFunction):
+class Identity(TemporalFunction):
     def __call__(self, anchor):
         return anchor
 
 class AnchoredInterval(TemporalFunction):
+    def __call__(self, anchor):
+        self.anchor = anchor
+        return self
+        
     def __init__(self, duration):
         self.duration = duration
+        self.anchor = None
 
 class PastAnchoredInterval(AnchoredInterval):
-    def __call__(self, anchor):
-        return anchor | self.duration
-
     def __str__(self):
-        return "LAST(%s)" % self.duration
+        if self.anchor:
+            return "LAST(%s)BEFORE(%s)" % (self.duration, self.anchor)
+        else:
+            return "LAST(%s)" % self.duration
 
 class FutureAnchoredInterval(AnchoredInterval):
-    def __call__(self, anchor):
-        return self.duration | anchor
-
     def __str__(self):
-        return "NEXT(%s)" % self.duration
+        if self.anchor:
+            return "NEXT(%s)AFTER(%s)" % (self.duration, self.anchor)
+        else:
+            return "NEXT(%s)" % self.duration
 
 class IndefReference(TemporalFunction): pass
 
@@ -93,18 +98,35 @@ class IndefFuture(IndefReference):
         return "INDEF_FUTURE"
 
 class AnchoredTimePoint(TemporalFunction):
+    def __call__(self, anchor):
+        self.anchor = anchor
+        return self
+    
     def __init__(self, duration):
+        self.anchor = None
         self.duration = duration
 
 class PastAnchoredTimePoint(AnchoredTimePoint):
     def __str__(self):
-        return "(%s)AGO" % self.duration
+        if self.anchor:
+            return "(%s)BEFORE(%s)" % (self.duration, self.anchor)
+        else:
+            return "(%s)AGO" % self.duration
 
 class FutureAnchoredTimePoint(AnchoredTimePoint):
     def __str__(self):
-        return "(%s)LATER" % self.duration
+        if self.anchor:
+            return "(%s)AFTER(%s)" % (self.duration, self.anchor)
+        else:
+            return "(%s)LATER" % self.duration
 
-class CoercedAnchoredInterval(AnchoredInterval): pass
+class CoercedTimePoint(TemporalFunction):
+    def __init__(self, timepoint, unit):
+        self.timepoint = timepoint
+        self.unit = unit
+
+    def __str__(self):
+        return "(%s)_AS_%s" % (self.timepoint, self.unit.__name__.upper())
 
 class TemporalModifier(object):
     def __init__(self, modifier, timex):
@@ -116,7 +138,13 @@ class TemporalModifier(object):
 
 class Mod(TemporalModifier): pass
 
-class Freq(TemporalModifier): pass
+class Freq(TemporalModifier): 
+    def __init__(self, frequency, interval):
+        self.frequency = frequency
+        self.interval = interval
+
+    def __str__(self):
+        return '%sx_PER(%s)' % (self.frequency, self.interval)
 
 class Quant(TemporalModifier):
     def __init__(self, modifier, timex):
