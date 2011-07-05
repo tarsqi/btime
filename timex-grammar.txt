@@ -35,18 +35,18 @@ present -> "now"
 coerced_exp -> "today" { CoercedTimePoint(Identity(), Day) }
     | "this" bare_unit { CoercedTimePoint(Identity(), _[1]) }
     | "the" "current" bare_unit { CoercedTimePoint(Identity(), _[2]) }
-    | last "week" { PastAnchoredTimePoint(Duration() | Weeks(1))(CoercedTimePoint(Identity(), Week)) }
-    | last "month" { PastAnchoredTimePoint(Duration() | Months(1))(CoercedTimePoint(Identity(), Month)) }
-    | last "year" { PastAnchoredTimePoint(Duration() | Years(1))(CoercedTimePoint(Identity(), Year)) }
-    | next "week" { FutureAnchoredTimePoint(Duration() | Weeks(1))(CoercedTimePoint(Identity(), Week)) }
-    | next "month" { FutureAnchoredTimePoint(Duration() | Months(1))(CoercedTimePoint(Identity(), Month)) }
-    | next "year" { FutureAnchoredTimePoint(Duration() | Years(1))(CoercedTimePoint(Identity(), Year)) }
-    | "yesterday" { PastAnchoredTimePoint(Duration() | Days(1))(CoercedTimePoint(Identity(), Day)) }
-    | "tomorrow" { FutureAnchoredTimePoint(Duration() | Days(1))(CoercedTimePoint(Identity(), Day)) }
+    | last "week" { PastAnchoredTimePoint(Duration() | Weeks(1), CoercedTimePoint(Identity(), Week)) }
+    | last "month" { PastAnchoredTimePoint(Duration() | Months(1), CoercedTimePoint(Identity(), Month)) }
+    | last "year" { PastAnchoredTimePoint(Duration() | Years(1), CoercedTimePoint(Identity(), Year)) }
+    | next "week" { FutureAnchoredTimePoint(Duration() | Weeks(1), CoercedTimePoint(Identity(), Week)) }
+    | next "month" { FutureAnchoredTimePoint(Duration() | Months(1), CoercedTimePoint(Identity(), Month)) }
+    | next "year" { FutureAnchoredTimePoint(Duration() | Years(1), CoercedTimePoint(Identity(), Year)) }
+    | "yesterday" { PastAnchoredTimePoint(Duration() | Days(1), CoercedTimePoint(Identity(), Day)) }
+    | "tomorrow" { FutureAnchoredTimePoint(Duration() | Days(1), CoercedTimePoint(Identity(), Day)) }
 
-last -> "last" | "latest" | "most" "recent" | dt last
+last -> "last" | "the" "latest" | "the" "most" "recent"
 
-next -> "next" | "following" | "coming" | dt next
+next -> "next" | "the" "following" | "the" "coming"
 
 time -> named_hour { Time(_[0]) }
     | hour ":" minute { Time(_[0], _[2]) }
@@ -119,11 +119,9 @@ day_of_week -> Abbrev("monday", 3) { DayOfWeek(1) }
 
 interval -> anchored_interval | duration
 
-anchored_interval -> "past" duration { PastAnchoredInterval(_[1]) }
-    | "last" duration { PastAnchoredInterval(_[1]) }
-    | "next" duration { FutureAnchoredInterval(_[2]) }
-    | "coming" duration { FutureAnchoredInterval(_[2]) }
-    | "the" anchored_interval { _[1] }
+anchored_interval -> "the" "past" duration { PastAnchoredInterval(_[2]) }
+    | "the" "next" duration { FutureAnchoredInterval(_[2]) }
+    | "the" "coming" duration { FutureAnchoredInterval(_[2]) }
     
 anchored_time_point -> duration "ago" { PastAnchoredTimePoint(_[0]) }
     | duration "earlier" { PastAnchoredTimePoint(_[0]) }
@@ -266,7 +264,8 @@ mod -> approx timex { Mod("APPROX", _[1]) }
     | less_than timex { Mod("LESS_THAN", _[1]) }
     | more_than timex { Mod("MORE_THAN", _[1]) }
     | start timex { Mod("START", _[1]) }
-    | end timex { Mod("END", _[1]) } 
+    | end timex { Mod("END", _[1]) }
+    | mid timex { Mod("MID", _[1]) }
 
 approx -> "a" "couple"
     | "a" "couple" "of"
@@ -302,6 +301,10 @@ start -> "early"
     | "the" "early"
     | "the" "start" "of"
     | "the" "beginning" "of"
+    
+mid -> "mid"
+    | "the" "mid"
+    | "the" "middle" "of"
 
 quant -> quantifier duration { Quant(_[0], _[1]) }
     | quantifier Any() duration { Quant(_[0], _[2]) }
@@ -333,6 +336,8 @@ indef_past -> "recent"
     | adv "recently"
     | "previous"
     | "previously"
+    | "former"
+    | "formerly"
     | "earlier"
     | "recent" plural_unit
     | "previous" plural_unit

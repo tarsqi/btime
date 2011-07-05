@@ -42,20 +42,33 @@ class MMDDToken(RegexpTerminal):
     def match(self, token):
         return super(MMDDToken, self).match(token)
 
-class MidToken(RegexpTerminal):
-    def __init__(self):
-        super(MMDDToken, self).__init__(r"^mid-.*$",
-                                        "mid-")
-
-    def match(self, token):
-        return super(MMDDToken, self).match(token)
-
 class Any(Terminal):
     def match(self, token): return True
+
+class GreaterThan(Terminal):
+    def __init__(self, lower_bound):
+        self.lower_bound = lower_bound
+    
+    def match(self, token):
+        try:
+            return int(token) and int(token) >= lower_bound
+        except Exception:
+            return False
+
+class LessThan(Terminal):
+    def __init__(self, upper_bound):
+        self.upper_bound = lower_bound
+    
+    def match(self, token):
+        try:
+            return int(token) and int(token) <= upper_bound
+        except Exception:
+            return False
             
 class TemporalFunction(object):
     def __call__(self, anchor):
-        raise ValueError("invalid temporal function")
+        raise ValueError("Not yet implemented for %s" %
+                         self.__class__.__name__)
 
     def __str__(self):
         return "%s()" % self.__class__.__name__.upper()
@@ -76,9 +89,9 @@ class AnchoredInterval(TemporalFunction):
 class PastAnchoredInterval(AnchoredInterval):
     def __str__(self):
         if self.anchor:
-            return "LAST(%s)BEFORE(%s)" % (self.duration, self.anchor)
+            return "PAST(%s)BEFORE(%s)" % (self.duration, self.anchor)
         else:
-            return "LAST(%s)" % self.duration
+            return "PAST(%s)" % self.duration
 
 class FutureAnchoredInterval(AnchoredInterval):
     def __str__(self):
@@ -99,12 +112,15 @@ class IndefFuture(IndefReference):
 
 class AnchoredTimePoint(TemporalFunction):
     def __call__(self, anchor):
-        self.anchor = anchor
+        if not (self.anchor and isinstance(self.anchor, TemporalFunction)):
+            self.anchor = anchor
+        else:
+            self.anchor(anchor) 
         return self
     
-    def __init__(self, duration):
-        self.anchor = None
+    def __init__(self, duration, anchor=None):
         self.duration = duration
+        self.anchor = anchor
 
 class PastAnchoredTimePoint(AnchoredTimePoint):
     def __str__(self):
@@ -125,10 +141,17 @@ class CoercedTimePoint(TemporalFunction):
         self.timepoint = timepoint
         self.unit = unit
 
-    def __str__(self):
-        return "(%s)_AS_%s" % (self.timepoint, self.unit.__name__.upper())
+    def __call__(self, anchor):
+        if isinstance(self.timepoint, TemporalFunction):
+            self.timepoint = self.timepoint(anchor)
+        else:
+            self.timepoint = anchor
+        return self
 
-class TemporalModifier(object):
+    def __str__(self):
+        return "(%s)_AS_%s" % (self.timepoint, self.unit.__name__)
+
+class TemporalModifier(TemporalFunction):
     def __init__(self, modifier, timex):
         self.modifier = modifier
         self.timex = timex
