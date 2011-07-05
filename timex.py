@@ -25,9 +25,7 @@ class MonthNumberToken(RegexpTerminal):
 
 class MMDDYYyyToken(RegexpTerminal):
     def __init__(self):
-        super(MMDDYYyyToken, self).__init__(r"([0-9]{1,2}(/|-)" + \
-                                            "[0-9]{1,2}(/|-)" + \
-                                            "([0-9]{2}|[0-9]{4}))$",
+        super(MMDDYYyyToken, self).__init__(r"^[0-9]{1,2}(/|-)[0-9]{1,2}(/|-)([0-9]{2}|[0-9]{4})$",
                                             "MMDDYYyy")
 
     def match(self, token):
@@ -35,12 +33,27 @@ class MMDDYYyyToken(RegexpTerminal):
 
 class MMDDToken(RegexpTerminal):
     def __init__(self):
-        super(MMDDToken, self).__init__(r"([0-9]{1,2}(/|-)" + \
-                                        "[0-9]{1,2})$",
+        super(MMDDToken, self).__init__(r"^[0-9]{1,2}(/|-)[0-9]{1,2}$",
                                         "MMDD")
 
     def match(self, token):
         return super(MMDDToken, self).match(token)
+
+class HHMMToken(RegexpTerminal):
+    def __init__(self):
+        super(HHMMToken, self).__init__(r"^[0-2]?\d:[0-5]\d$",
+                                        "HHMM")
+
+    def match(self, token):
+        return super(HHMMToken, self).match(token)
+
+class HHMMSSToken(RegexpTerminal):
+    def __init__(self):
+        super(HHMMSSToken, self).__init__(r"^[0-2]?\d:[0-5]\d:[0-5]\d$",
+                                          "HHMMSS")
+
+    def match(self, token):
+        return super(HHMMSSToken, self).match(token)
 
 class Any(Terminal):
     def match(self, token): return True
@@ -115,12 +128,12 @@ class AnchoredTimePoint(TemporalFunction):
         if not (self.anchor and isinstance(self.anchor, TemporalFunction)):
             self.anchor = anchor
         else:
-            self.anchor(anchor) 
+            self.anchor = self.anchor(anchor) 
         return self
     
-    def __init__(self, duration, anchor=None):
+    def __init__(self, duration):
         self.duration = duration
-        self.anchor = anchor
+        self.anchor = None
 
 class PastAnchoredTimePoint(AnchoredTimePoint):
     def __str__(self):
@@ -135,6 +148,32 @@ class FutureAnchoredTimePoint(AnchoredTimePoint):
             return "(%s)AFTER(%s)" % (self.duration, self.anchor)
         else:
             return "(%s)LATER" % self.duration
+
+class PredecessorOrSuccessor(TemporalFunction):
+    def __call__(self, anchor):
+        if not (self.anchor and isinstance(self.anchor, TemporalFunction)):
+            self.anchor = anchor
+        else:
+            self.anchor = self.anchor(anchor) 
+        return self
+    
+    def __init__(self, unit):
+        self.unit = unit
+        self.anchor = None
+
+class Predecessor(PredecessorOrSuccessor):
+    def __str__(self):
+        if self.anchor:
+            return "(%s)PRECEDING(%s)" % (self.unit.__name__, self.anchor)
+        else:
+            return "PRECEDING(%s)" % self.unit.__name__
+
+class Successor(PredecessorOrSuccessor):
+    def __str__(self):
+        if self.anchor:
+            return "(%s)SUCCEEDING(%s)" % (self.unit.__name__, self.anchor)
+        else:
+            return "SUCCESSIVE(%s)" % self.unit.__name__
 
 class CoercedTimePoint(TemporalFunction):
     def __init__(self, timepoint, unit):
@@ -195,6 +234,14 @@ def yyyymmdd_to_date(token):
 
 def yymmdd_to_date(token):
     return CalendarDate(token[:2], token[2:4], token[4:])
+
+def hhmmss_to_time(token):
+    tokens = re.findall(r'\d+', token)
+    return Time(tokens[0], tokens[1], tokens[2])
+
+def hhmm_to_time(token):
+    tokens = re.findall(r'\d+', token)
+    return Time(tokens[0], tokens[1])
 
 def sentences(s):
     """Given a string of English text with normalized spacing (i.e., exactly

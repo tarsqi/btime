@@ -2,7 +2,7 @@ timex -> present { Identity() }
     | indef_past { IndefPast() }
 	| indef_future { IndefFuture() }
 	| indef_duration { Duration() }
-	| coerced_exp
+	| coerced_timepoint
     | timepoint
     | interval
     | mod
@@ -18,6 +18,9 @@ timepoint -> date
     | year_and_week
     | quarter
     | anchored_time_point
+    | predecessor_or_successor
+    | date time { _[0] | _[1] }
+    | month year { _[1] | _[0] } 
 
 present -> "now"
     | "right" "now"
@@ -32,17 +35,18 @@ present -> "now"
     | "the" "present" "time"
     | "meanwhile"
     
-coerced_exp -> "today" { CoercedTimePoint(Identity(), Day) }
+predecessor_or_successor -> last "week" { Predecessor(Week)(Identity()) }
+    | last "month" { Predecessor(Month)(Identity()) }
+    | last "year" { Predecessor(Year)(Identity()) }
+    | next "week" { Successor(Week)(Identity()) }
+    | next "month" { Successor(Month)(Identity()) }
+    | next "year" { Successor(Year)(Identity()) }
+    | "yesterday" { Predecessor(Day)(Identity()) }
+    | "tomorrow" { Successor(Day)(Identity()) }
+
+coerced_timepoint -> "today" { CoercedTimePoint(Identity(), Day) }
     | "this" bare_unit { CoercedTimePoint(Identity(), _[1]) }
     | "the" "current" bare_unit { CoercedTimePoint(Identity(), _[2]) }
-    | last "week" { PastAnchoredTimePoint(Duration() | Weeks(1), CoercedTimePoint(Identity(), Week)) }
-    | last "month" { PastAnchoredTimePoint(Duration() | Months(1), CoercedTimePoint(Identity(), Month)) }
-    | last "year" { PastAnchoredTimePoint(Duration() | Years(1), CoercedTimePoint(Identity(), Year)) }
-    | next "week" { FutureAnchoredTimePoint(Duration() | Weeks(1), CoercedTimePoint(Identity(), Week)) }
-    | next "month" { FutureAnchoredTimePoint(Duration() | Months(1), CoercedTimePoint(Identity(), Month)) }
-    | next "year" { FutureAnchoredTimePoint(Duration() | Years(1), CoercedTimePoint(Identity(), Year)) }
-    | "yesterday" { PastAnchoredTimePoint(Duration() | Days(1), CoercedTimePoint(Identity(), Day)) }
-    | "tomorrow" { FutureAnchoredTimePoint(Duration() | Days(1), CoercedTimePoint(Identity(), Day)) }
 
 last -> "last" | "the" "latest" | "the" "most" "recent"
 
@@ -56,7 +60,9 @@ time -> named_hour { Time(_[0]) }
     | small "in" "the" "morning" { Time(_[0]) }
     | small r"p.m.?" { Time(int(_[0]) + 12) }
     | small "in" "the" r"evening|afternoon" { Time(int(_[0]) + 12) }
-
+    | HHMMSSToken() { hhmmss_to_time(_[0]) }
+    | HHMMToken() { hhmm_to_time(_[0]) }
+    
 hour -> named_hour
     | small { Hour(_[0]) }
 

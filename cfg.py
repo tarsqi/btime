@@ -10,7 +10,7 @@ from types import FunctionType
 # Russell 6-29: These classes all expect "word/POS" tokens as their input
 # for matching purposes. Make this look nicer later?
 
-input_regexp = r'^(.+)/([^/]+)$'
+input_regexp = r'^(.+)/([^\d]+)$'
 
 class Terminal(object):
     """Terminal objects are used to match input tokens. Subclasses should
