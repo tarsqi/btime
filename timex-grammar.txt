@@ -27,6 +27,7 @@ present -> "now"
     | "this" "time"
     | "current" "time"
     | "currently"
+    | "concurrently"
     | "current"
     | "the" "current" "time"
     | "present"
@@ -43,10 +44,14 @@ predecessor_or_successor -> last "week" { Predecessor(Week)(Identity()) }
     | next "year" { Successor(Year)(Identity()) }
     | "yesterday" { Predecessor(Day)(Identity()) }
     | "tomorrow" { Successor(Day)(Identity()) }
+    | last timepoint { Predecessor(_[1])(Identity()) }
+    | next timepoint { Successor(_[1])(Identity()) }
 
 coerced_timepoint -> "today" { CoercedTimePoint(Identity(), Day) }
     | "this" bare_unit { CoercedTimePoint(Identity(), _[1]) }
     | "the" "current" bare_unit { CoercedTimePoint(Identity(), _[2]) }
+    | "this" month { CoercedTimePoint(Identity(), _[1]) }
+    | "this" day_of_week { CoercedTimePoint(Identity(), _[1]) }
 
 last -> "last" | "the" "latest" | "the" "most" "recent"
 
@@ -126,14 +131,15 @@ day_of_week -> Abbrev("monday", 3) { DayOfWeek(1) }
 interval -> anchored_interval | duration
 
 anchored_interval -> "the" "past" duration { PastAnchoredInterval(_[2]) }
+    | "the" "last" duration { PastAnchoredInterval(_[2]) }
     | "the" "next" duration { FutureAnchoredInterval(_[2]) }
     | "the" "coming" duration { FutureAnchoredInterval(_[2]) }
     
-anchored_time_point -> duration "ago" { PastAnchoredTimePoint(_[0]) }
-    | duration "earlier" { PastAnchoredTimePoint(_[0]) }
-    | duration "hence" { FutureAnchoredTimePoint(_[0]) }
-    | duration "afterwards" { FutureAnchoredTimePoint(_[0]) }
-    | duration "later" { FutureAnchoredTimePoint(_[0]) }
+anchored_time_point -> timex "ago" { PastAnchoredTimePoint(_[0]) }
+    | timex "earlier" { PastAnchoredTimePoint(_[0]) }
+    | timex "hence" { FutureAnchoredTimePoint(_[0]) }
+    | timex "afterwards" { FutureAnchoredTimePoint(_[0]) }
+    | timex "later" { FutureAnchoredTimePoint(_[0]) }
 
 duration -> period { Duration() | _[0] }
     | bare_unit { Duration() | _[0](1) }
@@ -144,15 +150,21 @@ duration -> period { Duration() | _[0] }
 
 period -> number r"seconds?" { Seconds(_[0]) }
     | number r"minutes?" { Minutes(_[0]) }
+    | "a" "minute" "and" "a" "half" { Minutes(1) | Seconds(30) }
     | number "and" fraction r"minutes?" { Minutes(_[0]) | Seconds(60*_[2]) }
     | number r"hours?" { Hours(_[0]) }
     | number "and" fraction r"hours?" { Hours(_[0]) | Minutes(60*_[2]) }
+    | "an" "hour" "and" "a" "half" { Hours(1) | Minutes(30) }
     | number r"days?" { Days(_[0]) }
     | number "and" fraction r"days?" { Days(_[0]) | Hours(12*_[2]) }
+    | "a" "day" "and" "a" "half" { Days(1) | Hours(12) }
     | number r"weeks?" { Weeks(_[0]) }
+    | "a" "week" "and" "a" "half" { Weeks(1) | Days(3) | Hours(12) }
     | number r"months?" { Months(_[0]) }
+    | "a" "month" "and" "a" "half" { Months(1) | Days(15) }
     | number r"quarters?" { Quarters(_[0]) }
     | number r"years?" { Years(_[0]) }
+    | "a" "year" "and" "a" "half" { Years(1) | Months(6) }
     | number "and" fraction r"years?" { Years(_[0]) | Months(12*_[2]) }
     
 bare_unit -> "second" { Seconds }
@@ -272,6 +284,8 @@ mod -> approx timex { Mod("APPROX", _[1]) }
     | start timex { Mod("START", _[1]) }
     | end timex { Mod("END", _[1]) }
     | mid timex { Mod("MID", _[1]) }
+    | timex on_or_before { Mod("ON_OR_BEFORE", _[0]) }
+    | timex on_or_after { Mod("ON_OR_AFTER", _[0]) }
 
 approx -> "a" "couple"
     | "a" "couple" "of"
@@ -312,8 +326,14 @@ mid -> "mid"
     | "the" "mid"
     | "the" "middle" "of"
 
-quant -> quantifier duration { Quant(_[0], _[1]) }
-    | quantifier Any() duration { Quant(_[0], _[2]) }
+on_or_before -> "or" "earlier"
+    | "or" "sooner"
+    
+on_or_after -> "or" "later"
+
+quant -> "each" "of" interval { Quant(_[0], _[2]) } 
+    | quantifier interval { Quant(_[0], _[1]) }
+    | quantifier Any() interval { Quant(_[0], _[2]) }
     | quantifier timepoint { Quant(_[0], _[1]) }
     | quantifier Any() timepoint { Quant(_[0], _[2]) }
 

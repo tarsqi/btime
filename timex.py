@@ -164,14 +164,20 @@ class PredecessorOrSuccessor(TemporalFunction):
 class Predecessor(PredecessorOrSuccessor):
     def __str__(self):
         if self.anchor:
-            return "(%s)PRECEDING(%s)" % (self.unit.__name__, self.anchor)
+            if not isinstance(self.unit, iso8601.TimeUnit):
+                return "(%s)PRECEDING(%s)" % (self.unit.__name__, self.anchor)
+            else:
+                return "(%s)PRECEDING(%s)" % (repr(self.unit), self.anchor)
         else:
             return "PRECEDING(%s)" % self.unit.__name__
 
 class Successor(PredecessorOrSuccessor):
     def __str__(self):
         if self.anchor:
-            return "(%s)SUCCEEDING(%s)" % (self.unit.__name__, self.anchor)
+            if not isinstance(self.unit, iso8601.TimeUnit):
+                return "(%s)SUCCEEDING(%s)" % (self.unit.__name__, self.anchor)
+            else:
+                return "(%s)SUCCEEDING(%s)" % (repr(self.unit), self.anchor)
         else:
             return "SUCCESSIVE(%s)" % self.unit.__name__
 
@@ -188,7 +194,10 @@ class CoercedTimePoint(TemporalFunction):
         return self
 
     def __str__(self):
-        return "(%s)_AS_%s" % (self.timepoint, self.unit.__name__)
+        if not isinstance(self.unit, iso8601.TimeUnit):
+            return "(%s)_AS_%s" % (self.timepoint, self.unit.__name__)
+        else:
+            return "(%s)_AS_%s" % (self.timepoint, repr(self.unit))
 
 class TemporalModifier(TemporalFunction):
     def __init__(self, modifier, timex):
