@@ -17,7 +17,8 @@ class DayOfMonthToken(RegexpTerminal):
 
 class MonthNumberToken(RegexpTerminal):
     def __init__(self):
-        super(MonthNumberToken, self).__init__(r"([0-9]{1,2})$", "month number")
+        super(MonthNumberToken, self).__init__(r"([0-9]{1,2})$",
+                                               "month number")
 
     def match(self, token):
         m = super(MonthNumberToken, self).match(token)
@@ -25,8 +26,9 @@ class MonthNumberToken(RegexpTerminal):
 
 class MMDDYYyyToken(RegexpTerminal):
     def __init__(self):
-        super(MMDDYYyyToken, self).__init__(r"^[0-9]{1,2}(/|-)[0-9]{1,2}(/|-)([0-9]{2}|[0-9]{4})$",
-                                            "MMDDYYyy")
+        super(MMDDYYyyToken, self).__init__(
+            r"^[0-9]{1,2}(/|-)[0-9]{1,2}(/|-)([0-9]{2}|[0-9]{4})$",
+            "MMDDYYyy")
 
     def match(self, token):
         return super(MMDDYYyyToken, self).match(token)
@@ -57,26 +59,6 @@ class HHMMSSToken(RegexpTerminal):
 
 class Any(Terminal):
     def match(self, token): return True
-
-class GreaterThan(Terminal):
-    def __init__(self, lower_bound):
-        self.lower_bound = lower_bound
-    
-    def match(self, token):
-        try:
-            return int(token) and int(token) >= lower_bound
-        except Exception:
-            return False
-
-class LessThan(Terminal):
-    def __init__(self, upper_bound):
-        self.upper_bound = lower_bound
-    
-    def match(self, token):
-        try:
-            return int(token) and int(token) <= upper_bound
-        except Exception:
-            return False
             
 class TemporalFunction(object):
     def __call__(self, anchor):
@@ -86,9 +68,13 @@ class TemporalFunction(object):
     def __str__(self):
         return "%s()" % self.__class__.__name__.upper()
 
-class Identity(TemporalFunction):
+class Anchor(TemporalFunction):
     def __call__(self, anchor):
         return anchor
+
+class Deictic(Anchor): pass
+
+class Anaphoric(Anchor): pass
 
 class AnchoredInterval(TemporalFunction):
     def __call__(self, anchor):
@@ -140,7 +126,7 @@ class PastAnchoredTimePoint(AnchoredTimePoint):
         if self.anchor:
             return "(%s)BEFORE(%s)" % (self.duration, self.anchor)
         else:
-            return "(%s)AGO" % self.duration
+            return "(%s)EARLIER" % self.duration
 
 class FutureAnchoredTimePoint(AnchoredTimePoint):
     def __str__(self):
@@ -149,7 +135,7 @@ class FutureAnchoredTimePoint(AnchoredTimePoint):
         else:
             return "(%s)LATER" % self.duration
 
-class PredecessorOrSuccessor(TemporalFunction):
+class PreviousOrFollowing(TemporalFunction):
     def __call__(self, anchor):
         if not (self.anchor and isinstance(self.anchor, TemporalFunction)):
             self.anchor = anchor
@@ -161,25 +147,45 @@ class PredecessorOrSuccessor(TemporalFunction):
         self.unit = unit
         self.anchor = None
 
-class Predecessor(PredecessorOrSuccessor):
+class Previous(PreviousOrFollowing):
     def __str__(self):
         if self.anchor:
-            if not isinstance(self.unit, iso8601.TimeUnit):
-                return "(%s)PRECEDING(%s)" % (self.unit.__name__, self.anchor)
-            else:
-                return "(%s)PRECEDING(%s)" % (repr(self.unit), self.anchor)
+            return "PREVIOUS(%s)FROM(%s)" % (self.unit.__name__, self.anchor)
         else:
-            return "PRECEDING(%s)" % self.unit.__name__
+            return "PREVIOUS(%s)" % self.unit.__name__
 
-class Successor(PredecessorOrSuccessor):
+class Following(PreviousOrFollowing):
     def __str__(self):
         if self.anchor:
-            if not isinstance(self.unit, iso8601.TimeUnit):
-                return "(%s)SUCCEEDING(%s)" % (self.unit.__name__, self.anchor)
-            else:
-                return "(%s)SUCCEEDING(%s)" % (repr(self.unit), self.anchor)
+            return "(%s)FOLLOWING(%s)" % (self.unit.__name__, self.anchor)
         else:
-            return "SUCCESSIVE(%s)" % self.unit.__name__
+            return "FOLLOWING(%s)" % self.unit.__name__
+
+class FindNextOrLast(TemporalFunction):
+    def __call__(self, anchor):
+        if not (self.anchor and isinstance(self.anchor, TemporalFunction)):
+            self.anchor = anchor
+        else:
+            self.anchor = self.anchor(anchor) 
+        return self
+    
+    def __init__(self, timepoint):
+        self.timepoint = timepoint
+        self.anchor = None
+
+class FindNext(FindNextOrLast):
+    def __str__(self):
+        if self.anchor:
+            return "(%s)FIND_NEXT(%s)" % (self.timepoint, self.anchor)
+        else:
+            return "FIND_NEXT(%s)" % self.timepoint
+
+class FindLast(FindNextOrLast):
+    def __str__(self):
+        if self.anchor:
+            return "(%s)FIND_LAST(%s)" % (self.timepoint, self.anchor)
+        else:
+            return "FIND_LAST(%s)" % self.timepoint    
 
 class CoercedTimePoint(TemporalFunction):
     def __init__(self, timepoint, unit):

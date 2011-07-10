@@ -1,4 +1,4 @@
-timex -> present { Identity() } 
+timex -> present { Deictic() } 
     | indef_past { IndefPast() }
 	| indef_future { IndefFuture() }
 	| indef_duration { Duration() }
@@ -18,7 +18,8 @@ timepoint -> date
     | year_and_week
     | quarter
     | anchored_time_point
-    | predecessor_or_successor
+    | previous_or_following
+    | find_next_or_last
     | date time { _[0] | _[1] }
     | month year { _[1] | _[0] } 
 
@@ -36,26 +37,33 @@ present -> "now"
     | "the" "present" "time"
     | "meanwhile"
     
-predecessor_or_successor -> last "week" { Predecessor(Week)(Identity()) }
-    | last "month" { Predecessor(Month)(Identity()) }
-    | last "year" { Predecessor(Year)(Identity()) }
-    | next "week" { Successor(Week)(Identity()) }
-    | next "month" { Successor(Month)(Identity()) }
-    | next "year" { Successor(Year)(Identity()) }
-    | "yesterday" { Predecessor(Day)(Identity()) }
-    | "tomorrow" { Successor(Day)(Identity()) }
-    | last timepoint { Predecessor(_[1])(Identity()) }
-    | next timepoint { Successor(_[1])(Identity()) }
+previous_or_following -> "last" "week" { Previous(Week)(Deictic()) }
+    | "last" "month" { Previous(Month)(Deictic()) }
+    | "last" "year" { Previous(Year)(Deictic()) }
+    | "next" "week" { Following(Week)(Deictic()) }
+    | "next" "month" { Following(Month)(Deictic()) }
+    | "next" "year" { Following(Year)(Deictic()) }
+    | last_anaphoric "week" { Previous(Week)(Anaphoric()) }
+    | last_anaphoric "month" { Previous(Month)(Anaphoric()) }
+    | last_anaphoric "year" { Previous(Year)(Anaphoric()) }
+    | next_anaphoric "week" { Following(Week)(Anaphoric()) }
+    | next_anaphoric "month" { Following(Month)(Anaphoric()) }
+    | next_anaphoric "year" { Following(Year)(Anaphoric()) }
+    | "yesterday" { Previous(Day)(Deictic()) }
+    | "tomorrow" { Following(Day)(Deictic()) }
+    
+find_next_or_last -> "last" timepoint { FindLast(_[1])(Deictic()) }
+    | "next" timepoint { FindNext(_[1])(Deictic()) }
 
-coerced_timepoint -> "today" { CoercedTimePoint(Identity(), Day) }
-    | "this" bare_unit { CoercedTimePoint(Identity(), _[1]) }
-    | "the" "current" bare_unit { CoercedTimePoint(Identity(), _[2]) }
-    | "this" month { CoercedTimePoint(Identity(), _[1]) }
-    | "this" day_of_week { CoercedTimePoint(Identity(), _[1]) }
+coerced_timepoint -> "today" { CoercedTimePoint(Deictic(), Day) }
+    | "this" bare_unit { CoercedTimePoint(Deictic(), _[1]) }
+    | "the" "current" bare_unit { CoercedTimePoint(Deictic(), _[2]) }
+    | "this" month { CoercedTimePoint(Deictic(), _[1]) }
+    | "this" day_of_week { CoercedTimePoint(Deictic(), _[1]) }
 
-last -> "last" | "the" "latest" | "the" "most" "recent"
+last_anaphoric -> "the" "latest" | "the" "most" "recent" | "the" "earlier"
 
-next -> "next" | "the" "following" | "the" "coming"
+next_anaphoric -> "the" "following" | "the" "coming"
 
 time -> named_hour { Time(_[0]) }
     | hour ":" minute { Time(_[0], _[2]) }
@@ -135,10 +143,9 @@ anchored_interval -> "the" "past" duration { PastAnchoredInterval(_[2]) }
     | "the" "next" duration { FutureAnchoredInterval(_[2]) }
     | "the" "coming" duration { FutureAnchoredInterval(_[2]) }
     
-anchored_time_point -> timex "ago" { PastAnchoredTimePoint(_[0]) }
-    | timex "earlier" { PastAnchoredTimePoint(_[0]) }
-    | timex "hence" { FutureAnchoredTimePoint(_[0]) }
-    | timex "afterwards" { FutureAnchoredTimePoint(_[0]) }
+anchored_time_point -> timex "ago" { PastAnchoredTimePoint(_[0])(Deictic()) }
+    | timex "earlier" { PastAnchoredTimePoint(_[0])(Anaphoric()) }
+    | timex "afterwards" { FutureAnchoredTimePoint(_[0])(Anaphoric()) }
     | timex "later" { FutureAnchoredTimePoint(_[0]) }
 
 duration -> period { Duration() | _[0] }
