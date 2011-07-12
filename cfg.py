@@ -25,6 +25,7 @@ class Literal(Terminal):
         self.lit = unicode(lit)
 
     def match(self, token):
+        if not isinstance(token, basestring): return False
         return token and self.lit == unicode(token_word(token))
 
     def __repr__(self):
@@ -38,6 +39,7 @@ class POSTerminal(Terminal):
         self.pos = unicode(pos[1:])
 
     def match(self, token):
+        if not isinstance(token, basestring): return False
         return token and self.pos == unicode(token_pos(token))
 
     def __repr__(self):
@@ -52,6 +54,7 @@ class RegexpTerminal(Terminal):
         self.name = name or pattern
 
     def match(self, token):
+        if not isinstance(token, str): return False
         return token is not None and \
                self.pattern.match(unicode(token_word(token)))
 
@@ -204,12 +207,14 @@ class ParseTree(object):
                 self.children == other.children)
 
 def token_word(token):
+    if not isinstance(token, basestring): token = str(token)
     match = re.match(input_regexp, token)
     if match: return match.group(1)
     else: return token # allows things to (mostly) still work for
                        # untagged tokens
 
 def token_pos(token):
+    if not isinstance(token, basestring): token = str(token)
     match = re.match(input_regexp, token)
     if match: return match.group(2)
     else: return None

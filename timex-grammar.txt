@@ -28,14 +28,12 @@ present -> "now"
     | "this" "time"
     | "current" "time"
     | "currently"
-    | "concurrently"
     | "current"
     | "the" "current" "time"
     | "present"
     | "presently"
     | "present" "time"
     | "the" "present" "time"
-    | "meanwhile"
     
 previous_or_following -> "last" "week" { Previous(Week)(Deictic()) }
     | "last" "month" { Previous(Month)(Deictic()) }

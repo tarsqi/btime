@@ -6,6 +6,8 @@ from earley import Parser
 from grammarparser import parse_grammar_spec
 from iso8601 import *
 
+# Terminals for the timex grammar.
+
 class DayOfMonthToken(RegexpTerminal):
     def __init__(self):
         super(DayOfMonthToken, self).__init__(r"([0-9]{1,2})(st|nd|rd|th)?$",
@@ -59,6 +61,8 @@ class HHMMSSToken(RegexpTerminal):
 
 class Any(Terminal):
     def match(self, token): return True
+
+# Temporal functions.
             
 class TemporalFunction(object):
     def __call__(self, anchor):
@@ -67,6 +71,14 @@ class TemporalFunction(object):
 
     def __str__(self):
         return "%s()" % self.__class__.__name__.upper()
+
+class AnchoredTimex(TemporalFunction):
+    def __init__(self, timex, anchor):
+        self.timex = timex
+        self.anchor = anchor
+
+    def __str__(self):
+        return "(%s)ANCHORED_BY(%s)" % (self.timex, self.anchor)
 
 class Anchor(TemporalFunction):
     def __call__(self, anchor):
@@ -99,7 +111,13 @@ class FutureAnchoredInterval(AnchoredInterval):
         else:
             return "NEXT(%s)" % self.duration
 
-class IndefReference(TemporalFunction): pass
+class IndefReference(TemporalFunction):
+    def __init__(self):
+        self.anchor = None
+
+    def __call__(self, anchor):
+        self.anchor = anchor
+        return self
 
 class IndefPast(IndefReference): 
     def __str__(self):
@@ -228,7 +246,7 @@ class Quant(TemporalModifier):
         self.modifier = token_word(modifier)
         self.timex = timex
 
-def read_grammar(filename="timex-grammar.txt"):
+def read_timex_grammar(filename="timex-grammar.txt"):
     with open(filename) as f:
         return parse_grammar_spec(f.readline, "timex", globals())
 
@@ -287,7 +305,7 @@ def tokenize(sentence):
     return [word.lower().rstrip(".,;:!")
             for word in sentence.replace("-", " ").split(" ")]
 
-def parse(tokens, grammar=read_grammar()):
+def parse(tokens, grammar=read_timex_grammar()):
     tokens = list(tokens)
     parser = Parser(grammar)
     while tokens:
