@@ -54,7 +54,7 @@ class RegexpTerminal(Terminal):
         self.name = name or pattern
 
     def match(self, token):
-        if not isinstance(token, str): return False
+        if not isinstance(token, basestring): return False
         return token is not None and \
                self.pattern.match(unicode(token_word(token)))
 

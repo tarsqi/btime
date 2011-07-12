@@ -8,6 +8,7 @@ timex -> present { Deictic() }
     | mod
     | quant
     | freq
+    | wsj_expressions
     
 timepoint -> date
     | time
@@ -35,12 +36,12 @@ present -> "now"
     | "present" "time"
     | "the" "present" "time"
     
-previous_or_following -> "last" "week" { Previous(Week)(Deictic()) }
-    | "last" "month" { Previous(Month)(Deictic()) }
-    | "last" "year" { Previous(Year)(Deictic()) }
-    | "next" "week" { Following(Week)(Deictic()) }
-    | "next" "month" { Following(Month)(Deictic()) }
-    | "next" "year" { Following(Year)(Deictic()) }
+previous_or_following -> last_deictic "week" { Previous(Week)(Deictic()) }
+    | last_deictic "month" { Previous(Month)(Deictic()) }
+    | last_deictic "year" { Previous(Year)(Deictic()) }
+    | next_deictic "week" { Following(Week)(Deictic()) }
+    | next_deictic "month" { Following(Month)(Deictic()) }
+    | next_deictic "year" { Following(Year)(Deictic()) }
     | last_anaphoric "week" { Previous(Week)(Anaphoric()) }
     | last_anaphoric "month" { Previous(Month)(Anaphoric()) }
     | last_anaphoric "year" { Previous(Year)(Anaphoric()) }
@@ -50,14 +51,18 @@ previous_or_following -> "last" "week" { Previous(Week)(Deictic()) }
     | "yesterday" { Previous(Day)(Deictic()) }
     | "tomorrow" { Following(Day)(Deictic()) }
     
-find_next_or_last -> "last" timepoint { FindLast(_[1])(Deictic()) }
-    | "next" timepoint { FindNext(_[1])(Deictic()) }
+find_next_or_last -> last_deictic timepoint { FindLast(_[1])(Deictic()) }
+    | next_deictic timepoint { FindNext(_[1])(Deictic()) }
 
 coerced_timepoint -> "today" { CoercedTimePoint(Deictic(), Day) }
     | "this" bare_unit { CoercedTimePoint(Deictic(), _[1]) }
     | "the" "current" bare_unit { CoercedTimePoint(Deictic(), _[2]) }
     | "this" month { CoercedTimePoint(Deictic(), _[1]) }
     | "this" day_of_week { CoercedTimePoint(Deictic(), _[1]) }
+
+last_deictic -> "last"
+
+next_deictic -> "next" | "this" "coming"
 
 last_anaphoric -> "the" "latest" | "the" "most" "recent" | "the" "earlier"
 
@@ -117,8 +122,14 @@ month_and_day -> month day { Month(_[0]) | DayOfMonth(_[1]) }
     | "the" ordinal "of" month { Month(_[3]) | DayOfMonth(_[1]) }
     | MMDDToken() { mmdd_to_date(_[0]) }
     
-year -> cardinal | r"^(19|20)\d{2}$" { Year(_[0]) }
-    | "the" "year" year { _[2] }
+year -> GreaterThan(1799) { Year(_[0]) }
+    | r"^(18|19|20)\d{2}$" { Year(_[0]) }
+    | "the" "year" number { Year(_[2]) }
+    | teen small { Year((_[0] * 100) + _[1]) }
+    | teen "and" small { Year((_[0] * 100) + _[2]) }
+    | "two" "thousand" { Year(2000) }
+    | "two" "thousand" small { Year(2000 + _[2]) }
+    | "two" "thousand" "and" small { Year(2000 + _[3]) }
 
 year_and_week -> ordinal "week" "of" year { Year(_[3]) | Week(_[0]) }
     | "the" ordinal "week" "of" year { Year(_[4]) | Week(_[1]) }
@@ -207,7 +218,7 @@ ones -> "one" { 1 }
     | r"^an?$" { 1 }
     | "two" { 2 }
     | "three" { 3 }
-    | "four" { 4 }
+    | "four" { 4}
     | "five" { 5 }
     | "six" { 6 }
     | "seven" { 7 }
@@ -243,6 +254,8 @@ thousands -> small small { _[0] * 100 + _[1] }
     | hundreds "thousand" small { (_[0] * 1000) + _[2] }
     | hundreds "thousand" "and" small { (_[0] * 1000) + _[3] }
     | hundreds "thousand" hundreds { (_[0] * 1000) + _[2] }
+    | teen small { (_[0] * 100) + _[1] }
+    | teen "and" small { (_[0] * 100) + _[2] }
 
 ordinal -> ord_ones | ord_small 
 ord_small -> r"[0-9]+(st|nd|rd|th)" { int(_[0][:-2]) }
@@ -395,6 +408,11 @@ indef_duration -> dt "time"
     | r"^an?" Any() "while"
     | dt "period"
     
+wsj_expressions -> dt_any bare_unit "ago" "period" { PastAnchoredTimePoint(_[1](1))(Deictic()) }
+    | dt_any bare_unit "earlier" "period" { PastAnchoredTimePoint(_[1](1))(Anaphoric()) }
+    | dt_any bare_unit "ago" bare_unit { CoercedTimePoint(PastAnchoredTimePoint(_[1](1))(Deictic()), _[3]) }
+    | dt_any bare_unit "earlier" bare_unit { CoercedTimePoint(PastAnchoredTimePoint(_[1](1))(Anaphoric()), _[3]) }
+    
 adj_phrase -> adj
     | adj_phrase adj
     | adj adj_phrase
@@ -416,4 +434,5 @@ dt -> "/dt"
     | "a"
     | "an"
     | "the"
+dt_any -> dt | dt Any()
 modal -> "/md"

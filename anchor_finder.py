@@ -70,8 +70,7 @@ class Anaphoric(Terminal):
     def match(self, token):
         return (isinstance(token, TemporalFunction) and \
                 not anchor_type(token) == Deictic) or \
-               ((isinstance(token, iso8601.TimeRep) or \
-                 isinstance(token, iso8601.TimeUnit)) and \
+               (isinstance(token, (iso8601.TimeRep, iso8601.TimeUnit)) and \
                 not isinstance(token, iso8601.CalendarDate))
 
 class Signal(Terminal):
@@ -89,10 +88,8 @@ class Timex(Terminal):
         pass
 
     def match(self, token):
-        return isinstance(token, TemporalFunction) or \
-               isinstance(token, Anchor) or \
-               isinstance(token, iso8601.TimeRep) or \
-               isinstance(token, iso8601.TimeUnit)
+        return isinstance(token, (TemporalFunction, Anchor,
+                                  iso8601.TimeRep, iso8601.TimeUnit))
 
 def anchor_type(rep):
     if isinstance(rep, Anchor) or isinstance(rep, iso8601.TimeRep):
@@ -113,9 +110,14 @@ def strip_timexes(doc):
                     sent.insert(i+j, tokens[j])
                 doc.sentences[k] = sent
 
-def tag_timexes(doc):
+def tag_timexes(doc, verbose=False):
     for i in range(len(doc.sentences)):
-        doc.sentences[i] = [p for p in parse(doc.sentences[i])]
+        sent = []
+        for p in parse(doc.sentences[i]):
+            if verbose and not isinstance(p, (basestring, XMLTag)):
+                print 'parsed %s' % p
+            sent.append(p)
+        doc.sentences[i] = sent
 
 def tml_tokenize(raw):
     i = 0
@@ -222,94 +224,10 @@ def prefixed_dict(dictionary, prefix):
         out['%s_%s' % (prefix, key)] = dictionary[key]
     return out
 
-def print_stats(test_feature_sets, classifier):
-    "Displays statistics for the given classifier."
-    for tag in sorted(set(x[1] for x in test_feature_sets)):
-        print 'TAG:', tag
-        print_label_stats(test_feature_sets, classifier, tag)
-
-def print_label_stats(test_feature_sets, classifier, target_label):
-    "Prints precision, recall and F-measure for the target label."
-    gold = []
-    classified = []
-    for i in range(len(test_feature_sets)):
-        (features, label) = test_feature_sets[i]
-        if label == target_label:
-            gold.append(i)
-        if classifier.classify(features) == target_label:
-            classified.append(i)
-    try:
-        print 'Precision: %.2f' % nltk.metrics.precision(set(gold),
-                                                         set(classified))
-        print 'Recall: %.2f' % nltk.metrics.recall(set(gold),
-                                                   set(classified))
-        print 'F-measure: %.2f' % nltk.metrics.f_measure(set(gold),
-                                                         set(classified))
-    except Exception:
-        print 'n/a'
-
-def write_anaphora(docs=[t for t in get_tml_files()],
-                   out_file='anaphoric.txt'):
-    anchors = []
-    f = codecs.open(out_file, mode='w', encoding='UTF-8')
-    for d in docs:
-        anchors.extend(write_anaphoric_sents(d, f))
-    f.close()
-    return anchors
-
-def write_anaphoric_sents(doc, f):
-    f.write('File name: %s\n\n' % doc.name)
-    anchors = []
-    for i in range(len(doc.sentences)):
-        for j in range(len(doc.sentences[i])):
-            token = doc.sentences[i][j]
-            if isinstance(token, XMLTag) and \
-               token.type == 'TIMEX3' and \
-               token['anchorTimeID'] and \
-               token['anchorTimeID'] != doc.creation_id:
-                out_list = map(str, doc.sentences[i][:])
-                out_list[j] = '<< ' + out_list[j].upper() + ' >>'
-                f.write('tid %s sent %d:\n' % (token['tid'], i))
-                f.write(' '.join(out_list) + '\n\n')
-                anchorID = token['anchorTimeID']
-                for t in doc.timexes:
-                    if t[0] == anchorID: x, y = t[1]
-                out_list = map(str, doc.sentences[x][:])
-                out_list[y] = '<< ' + out_list[y].upper() + ' >>'
-                f.write('refers to tid %s sent %d:\n' % (anchorID, x))
-                tids = map(lambda x: x[0], doc.timexes)
-                f.write('%d timexes ago, %d sentences ago.\n' % \
-                        (tids.index(token['tid']) - \
-                         tids.index(anchorID), i - x))
-                f.write(' '.join(out_list) + '\n\n')
-                anchors.append(doc.sentences[x][y])
-    return anchors
-
 def read_anaphoric_grammar(filename="anaphoric_grammar.txt"):
     with open(filename) as f:
         return parse_grammar_spec(f.readline, "parse", globals())
-
+    
 def anaphoric_parse(tokens):
     return parse(tokens, read_anaphoric_grammar())
 
-file_gen = get_tml_files()
-file_gen.next()
-file_gen.next()
-doc = file_gen.next()
-
-##random.shuffle(all_docs)
-##
-##training = []
-##test = []
-##
-##for i in range(len(all_docs)):
-##    if i < 150:
-##        training.extend([f for f in doc_features(all_docs[i], True)
-##                         if f[1] != 'UNANCHORED'])
-##    else:
-##        test.extend([f for f in doc_features(all_docs[i], True)
-##                    if f[1] != 'UNANCHORED'])
-##
-##classifier = MaxentClassifier.train(training, max_iter=10)
-##print_stats(test, classifier)
-##

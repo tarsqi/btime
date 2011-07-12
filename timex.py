@@ -62,6 +62,16 @@ class HHMMSSToken(RegexpTerminal):
 class Any(Terminal):
     def match(self, token): return True
 
+class GreaterThan(Terminal):
+    def __init__(self, lower_bound):
+        self.lower_bound = lower_bound
+
+    def match(self, token):
+        try:
+            return token > lower_bound
+        except Exception:
+            return False
+
 # Temporal functions.
             
 class TemporalFunction(object):
