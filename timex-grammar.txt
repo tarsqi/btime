@@ -313,6 +313,7 @@ approx -> "a" "couple"
     | "around"
 
 equal_or_less -> "nearly"
+    | "within"
     | "approaching"
     | "at" "most"
     | "up" "to"
@@ -408,10 +409,12 @@ indef_duration -> dt "time"
     | r"^an?" Any() "while"
     | dt "period"
     
-wsj_expressions -> dt_any bare_unit "ago" "period" { PastAnchoredTimePoint(_[1](1))(Deictic()) }
-    | dt_any bare_unit "earlier" "period" { PastAnchoredTimePoint(_[1](1))(Anaphoric()) }
-    | dt_any bare_unit "ago" bare_unit { CoercedTimePoint(PastAnchoredTimePoint(_[1](1))(Deictic()), _[3]) }
-    | dt_any bare_unit "earlier" bare_unit { CoercedTimePoint(PastAnchoredTimePoint(_[1](1))(Anaphoric()), _[3]) }
+wsj_expressions -> dt_any bare_unit "ago" "period" { PastAnchoredTimePoint(Duration() | _[1](1))(Deictic()) }
+    | dt_any bare_unit "earlier" "period" { PastAnchoredTimePoint(Duration() | _[1](1))(Anaphoric()) }
+    | dt_any bare_unit "ago" bare_unit { CoercedTimePoint(PastAnchoredTimePoint(Duration() | _[1](1))(Deictic()), _[3]) }
+    | dt_any bare_unit "earlier" bare_unit { CoercedTimePoint(PastAnchoredTimePoint(Duration() | _[1](1))(Anaphoric()), _[3]) }
+    | dt_any bare_unit "ago" duration { CoercedTimePoint(PastAnchoredTimePoint(_[1])(Deictic()), _[3]) }
+    | dt_any bare_unit "earlier" duration { CoercedTimePoint(PastAnchoredTimePoint(_[1])(Anaphoric()), _[3]) }
     
 adj_phrase -> adj
     | adj_phrase adj

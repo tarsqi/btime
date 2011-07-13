@@ -99,7 +99,8 @@ def anchor_type(rep):
     else:
         return anchor_type(rep.anchor)
 
-def strip_timexes(doc):
+def strip_timexes(doc_):
+    doc = deepcopy(doc_)
     for k in range(len(doc.sentences)):
         sent = doc.sentences[k]
         for i in range(len(sent)):
@@ -109,8 +110,10 @@ def strip_timexes(doc):
                 for j in range(len(tokens)):
                     sent.insert(i+j, tokens[j])
                 doc.sentences[k] = sent
+    return doc
 
-def tag_timexes(doc, verbose=False):
+def tag_timexes(doc_, verbose=False):
+    doc = deepcopy(doc_)
     for i in range(len(doc.sentences)):
         sent = []
         for p in parse(doc.sentences[i]):
@@ -118,6 +121,7 @@ def tag_timexes(doc, verbose=False):
                 print 'parsed %s' % p
             sent.append(p)
         doc.sentences[i] = sent
+    return doc
 
 def tml_tokenize(raw):
     i = 0
