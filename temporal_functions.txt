@@ -1,0 +1,207 @@
+Temporal Functions
+2011.7.14
+Russell Entrikin
+
+This file documents the kinds of temporal functions implemented in timex.py.
+
+ANCHOR TYPES
+
+Note that the generic Anchor class is also a subclass of TemporalFunction.
+
+####
+
+Deictic(Anchor) 
+initargs: none
+
+A temporal function with a deictic anchor must be anchored in "utterance time"
+- in this case, the creation date of the document.
+
+Examples from TimeML corpus:
+
+('about two years ago', 'APPROX((P2Y)BEFORE(DEICTIC()))')
+('today', '(DEICTIC())_AS_Day')
+
+####
+
+Anaphoric(Anchor)
+initargs: none
+
+A temporal function with an anaphoric anchor is anchored in "reference time".
+"Reference time" may be the same as "utterance time", but need not be. One
+example is the past perfect: 
+
+I went on a cruise. I had bought a ticket a week earlier.
+
+"A week earlier" is anchored not in utterance time, but the time of the past
+event of going on a cruise. Note that the same sentence is ungrammatical with
+a deictic anchor:
+
+I went on a cruise. I had bought a ticket *(a week ago).
+
+####
+
+TEMPORAL FUNCTIONS
+
+####
+
+AnchoredTimex(TemporalFunction)
+initargs: timex, anchor
+
+Even an expression like "Aug. 6" is a temporal function, since it cannot be
+resolved to a full calendar date without being anchored in a year. The 
+AnchoredTimex class can be used to bind timexes and anchors (to be merged
+later).
+
+####
+
+AnchoredInterval(TemporalFunction)
+initargs: duration
+subclasses: PastAnchoredInterval, FutureAnchoredInterval
+
+A time interval of a specific duration which either starts or ends at the
+anchor.
+
+Examples from TimeML corpus:
+
+('The last two months', 'PAST(P2M)')
+('at least the past 18 months', 'EQUAL_OR_MORE(PAST(P18M))')
+('the next two years or so', 'APPROX(NEXT(P2Y))')
+
+####
+
+IndefReference(TemporalFunction)
+initargs: none
+subclasses: IndefPast, IndefFuture, IndefTimePoint
+
+A vague reference to the past or future, or an indefinite point in time which
+can (hopefully) resolved to the past or future using tense information. 
+(Indefinite durations are expressed by Duration() with no initargs.)
+
+Examples from TimeML corpus:
+
+('the moment', 'INDEF_TIMEPOINT')
+('the near future', 'INDEF_FUTURE')
+('the next 12 to 18 months', 'INDEF_PAST')
+
+####
+
+GenericPlural(TemporalFunction)
+initargs: unit
+
+An indefinite plural number of units of time.
+
+Examples from TimeML corpus:
+
+('two to three weeks', 'SOME(Weeks)')
+('A few days', 'SOME(Days)')
+
+####
+
+AnchoredTimePoint(TemporalFunction)
+initargs: duration
+subclasses: PastAnchoredTimePoint, FutureAnchoredTimePoint
+
+A point in time at a distance from the anchor specified by a duration.
+
+Examples from TimeML corpus:
+
+('a year earlier', '(P1Y)BEFORE(ANAPHORIC())')
+('the comparable year-ago quarter', '((P1Y)BEFORE(DEICTIC()))_AS_Quarters')
+
+Note that this temporal function is distinct from AnchoredInterval. For 
+example, "the last two months" refers to the INTERVAL of the past two 
+months, whereas "two months ago" refers to the TIMEPOINT at the earlier
+terminus of that same interval.
+
+####
+
+PreviousOrFollowing(TemporalFunction)
+initargs: unit
+subclasses: Previous, Following
+
+This temporal function simplifies to:
+CoercedTimePoint(anchor, unit) +/- unit(1)
+
+It is desirable to keep this function distinct from CoercedTimePoint, both
+to save keystrokes, and to avoid strange output resulting in accidentally
+entering different units for the coercion and subtraction.
+CoercedTimePoint(Deictic(), Month) +/- Year(1) would mean something like 
+'this same month, a year from now', which is very rare in English.
+
+Examples from TimeML corpus:
+
+('last month', 'PREVIOUS(Month)FROM(DEICTIC())')
+('late yesterday', 'END(PREVIOUS(Day)FROM(DEICTIC()))')
+
+Note that this temporal function is distinct from AnchoredTimePoint and
+AnchoredInterval. Assuming today is July 14 2011:
+
+last month = Previous(Month) = June 2011 (a timepoint)
+
+the past month = PastAnchoredInterval(Duration() | Months(1)) 
+               = June 14 2011 to July 14 2011 (a duration)
+
+a month ago = PastAnchoredTimePoint(Duration() | Months(1)) 
+            = June 14 2011 (a timepoint)
+            
+####
+
+FindNextOrLast(TemporalFunction)
+initargs: timepoint
+subclasses: FindNext, FindLast
+
+This temporal function finds the next or last instance of a specific timepoint, 
+e.g. a weekday or a month. 
+
+Examples from TimeML corpus:
+
+('Last Friday', '(5)FIND_LAST(DEICTIC())')
+('last December', '(12)FIND_LAST(DEICTIC())')
+
+Note that, although expressions like 'last month' and 'last Tuesday' look 
+very similar, they are in fact different temporal functions - it makes no 
+sense to coerce an anchor to 'Tuesday' and add another Tuesday to it.
+
+Also note that English has several possible interpretations for 
+'next *weekday*':
+
+FindNext(*weekday*) = 'this coming *weekday*'
+Following(Week) | *weekday* = '*weekday* next week'
+FindNext(*weekday*)(FindNext(*weekday*)) = '*weekday* after this coming one'
+
+When the actual resolution of anchors and temporal expressions is implemented
+within the FindNextOrLast class, one of these interpretations will be settled
+upon.
+
+####
+
+CoercedTimePoint(TemporalFunction)
+initargs: timepoint, unit
+
+Coerces a timepoint to a different unit.
+
+Examples from TimeML corpus:
+
+('the year-earlier quarter', '((P1Y)BEFORE(ANAPHORIC()))_AS_Quarters')
+('today', '(DEICTIC())_AS_Day')
+
+It may seem odd that the top-level temporal function for 'today' is 
+CoercedTimePoint, whereas the function for 'yesterday' is Previous.
+As explained under PreviousOrFollowing, that temporal function will
+simplify to a CoercedTimePoint and an addition/subtraction of an interval.
+
+####
+
+TemporalModifier(TemporalFunction)
+initargs: modifier, timex
+subclasses: Mod, Quant; also Freq, which takes (frequency, interval) 
+             as initargs 
+             
+These are modifiers which correspond to the mod=, quant=, and freq= attributes
+of TIMEX3 tags.
+
+Examples from TimeML corpus:
+
+('every month', 'EVERY(P1M)')
+('at least 30 days', 'EQUAL_OR_MORE(P30D)')
+

@@ -5,6 +5,7 @@ from cfg import *
 from earley import Parser
 from grammarparser import parse_grammar_spec
 from iso8601 import *
+from read_tml import *
 
 # Terminals for the timex grammar.
 
@@ -72,6 +73,14 @@ class GreaterThan(Terminal):
         except Exception:
             return False
 
+class Exact(Terminal):
+    def __init__(self, lit):
+        self.lit = unicode(lit)
+    
+    def match(self, token):
+        if not isinstance(token, basestring): return False
+        return token and self.lit == unicode(token_word(token))
+
 # Temporal functions.
             
 class TemporalFunction(object):
@@ -136,6 +145,17 @@ class IndefPast(IndefReference):
 class IndefFuture(IndefReference): 
     def __str__(self):
         return "INDEF_FUTURE"
+
+class IndefTimePoint(IndefReference):
+    def __str__(self):
+        return "INDEF_TIMEPOINT"
+
+class GenericPlural(TemporalFunction):
+    def __init__(self, unit):
+        self.unit = unit
+
+    def __str__(self):
+        return "SOME(%s)" % self.unit.__name__
 
 class AnchoredTimePoint(TemporalFunction):
     def __call__(self, anchor):
@@ -228,7 +248,7 @@ class CoercedTimePoint(TemporalFunction):
         return self
 
     def __str__(self):
-        if not isinstance(self.unit, iso8601.TimeUnit):
+        if not isinstance(self.unit, (iso8601.TimeUnit, iso8601.Duration)):
             return "(%s)_AS_%s" % (self.timepoint, self.unit.__name__)
         else:
             return "(%s)_AS_%s" % (self.timepoint, repr(self.unit))
@@ -255,6 +275,14 @@ class Quant(TemporalModifier):
     def __init__(self, modifier, timex):
         self.modifier = token_word(modifier)
         self.timex = timex
+
+class DoNotParse(object):
+    def __init__(self, dontparse):
+        self.dontparse = dontparse
+
+    def __call__(self):
+        for x in self.dontparse:
+            yield x
 
 def read_timex_grammar(filename="timex-grammar.txt"):
     with open(filename) as f:
@@ -307,13 +335,17 @@ def sentences(s):
     if i < n and i < j:
         yield s[i:j]
 
-def tokenize(sentence):
-    """Produce a list of tokens from the given sentence (a string).
-
-    This implementation is dead simple, and is not meant for production use.
-    It assumes normalized input."""
-    return [word.lower().rstrip(".,;:!")
-            for word in sentence.replace("-", " ").split(" ")]
+def tokenize(text):
+    sents = [t for t in tml_tokenize(text)]
+    toks = []
+    for s in sents: toks.extend(s)
+    return toks
+##    """Produce a list of tokens from the given sentence (a string).
+##
+##    This implementation is dead simple, and is not meant for production use.
+##    It assumes normalized input."""
+##    return [word.lower().rstrip(".,;:!")
+##            for word in sentence.replace("-", " ").split(" ")]
 
 def parse(tokens, grammar=read_timex_grammar()):
     tokens = list(tokens)
@@ -322,7 +354,12 @@ def parse(tokens, grammar=read_timex_grammar()):
         parser.parse(tokens)
         try:
             tree = parser.parses().next()
-            yield parser.grammar.eval(tree)
+            next_parse = parser.grammar.eval(tree)
+            if isinstance(next_parse, DoNotParse):
+                for p in next_parse():
+                    yield p
+            else:
+                yield next_parse
             del tokens[0:len(list(tree.leaves()))]
         except StopIteration:
             yield tokens.pop(0)

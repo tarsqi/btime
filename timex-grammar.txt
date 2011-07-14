@@ -8,7 +8,10 @@ timex -> present { Deictic() }
     | mod
     | quant
     | freq
-    | wsj_expressions
+    | wsj_expression
+    | adjectival_timex
+    | generic_plural
+    | do_not_parse
     
 timepoint -> date
     | time
@@ -23,6 +26,7 @@ timepoint -> date
     | find_next_or_last
     | date time { _[0] | _[1] }
     | month year { _[1] | _[0] } 
+    | indef_timepoint { IndefTimePoint() }
 
 present -> "now"
     | "right" "now"
@@ -71,11 +75,12 @@ next_anaphoric -> "the" "following" | "the" "coming"
 time -> named_hour { Time(_[0]) }
     | hour ":" minute { Time(_[0], _[2]) }
     | minute r"past|after" hour { Time(_[2], _[0]) }
-    | minute r"of|to|before|'?till" hour { Time(_[2]-1, 60-int(_[0])) }
-    | small r"a.m.?" { Time(_[0]) }
-    | small "in" "the" "morning" { Time(_[0]) }
-    | small r"p.m.?" { Time(int(_[0]) + 12) }
-    | small "in" "the" r"evening|afternoon" { Time(int(_[0]) + 12) }
+    | small_num r"a\.m\." { Time(_[0]) }
+    | small_num r"a\.m" "." { Time(_[0]) }
+    | small_num "in" "the" "morning" { Time(_[0]) }
+    | small_num r"p\.m\." { Time(int(_[0]) + 12) }
+    | small_num r"p\.m" "." { Time(int(_[0]) + 12) }
+    | small_num "in" "the" r"evening|afternoon" { Time(int(_[0]) + 12) }
     | HHMMSSToken() { hhmmss_to_time(_[0]) }
     | HHMMToken() { hhmm_to_time(_[0]) }
     
@@ -92,6 +97,9 @@ minute -> small { Minute(_[0]) }
 
 date -> day month year { CalendarDate(_[2], _[1], _[0]) }
     | month day year { CalendarDate(_[2], _[0], _[1]) }
+    | day month "," year { CalendarDate(_[3], _[1], _[0]) }
+    | month "." day "," year { CalendarDate(_[4], _[0], _[2]) }
+    | month day "," year { CalendarDate(_[3], _[0], _[1]) }
     | MMDDYYyyToken() { mmddyyyy_to_date(_[0]) }
     | r"^(19|20)\d{6}$" { yyyymmdd_to_date(_[0]) }
     | r"^\d{6}$" { yymmdd_to_date(_[0]) }
@@ -101,9 +109,10 @@ day -> small { DayOfMonth(_[0]) }
 
 month -> Abbrev("january", 3) { Month(1) }
     | Abbrev("february", 3) { Month(2) }
-    | Abbrev("march", 3) { Month(3) }
+    | Exact("March") { Month(3) }
+	| Exact("Mar") "." { Month(3) }
     | Abbrev("april", 3) { Month(4) }
-    | WordNotPOS("may", "md") { Month(5) }
+    | Exact("May") { Month(5) }
     | Abbrev("june", 3) { Month(6) }
     | Abbrev("july", 3) { Month(7) }
     | Abbrev("august", 3) { Month(8) }
@@ -114,8 +123,10 @@ month -> Abbrev("january", 3) { Month(1) }
     
 quarter -> ordinal "quarter" { Quarter(_[0]) } 
     | "the" ordinal "quarter" { Quarter(_[1]) } 
+    | ordinal "-" "quarter" { Quarter(_[0]) }
 
 month_and_day -> month day { Month(_[0]) | DayOfMonth(_[1]) }
+    | month "." day { Month(_[0]) | DayOfMonth(_[2]) }
     | month ordinal { Month(_[0]) | DayOfMonth(_[1]) }
     | day "of" month { Month(_[2]) | DayOfMonth(_[0])  }
     | ordinal "of" month { Month(_[2]) | DayOfMonth(_[0]) }
@@ -152,17 +163,17 @@ anchored_interval -> "the" "past" duration { PastAnchoredInterval(_[2]) }
     | "the" "next" duration { FutureAnchoredInterval(_[2]) }
     | "the" "coming" duration { FutureAnchoredInterval(_[2]) }
     
-anchored_time_point -> timex "ago" { PastAnchoredTimePoint(_[0])(Deictic()) }
-    | timex "earlier" { PastAnchoredTimePoint(_[0])(Anaphoric()) }
-    | timex "afterwards" { FutureAnchoredTimePoint(_[0])(Anaphoric()) }
-    | timex "later" { FutureAnchoredTimePoint(_[0]) }
+anchored_time_point -> duration "ago" { PastAnchoredTimePoint(_[0])(Deictic()) }
+    | duration "earlier" { PastAnchoredTimePoint(_[0])(Anaphoric()) }
+    | duration "afterwards" { FutureAnchoredTimePoint(_[0])(Anaphoric()) }
+    | duration "later" { FutureAnchoredTimePoint(_[0]) }
 
 duration -> period { Duration() | _[0] }
     | bare_unit { Duration() | _[0](1) }
     | duration period { _[0] | _[1] }
     | duration "and" period { _[0] | _[2] }
     | duration "period" { _[0] }
-    | "the" duration { _[1] }
+    | dt_any duration { _[1] }
 
 period -> number r"seconds?" { Seconds(_[0]) }
     | number r"minutes?" { Minutes(_[0]) }
@@ -208,14 +219,16 @@ number -> r"[0-9]+$" { int(_[0]) }
 cardinal -> zero | small | hundreds | thousands
 zero -> "0" { 0 }
     | r"(zero|oh?|n?[ao]ught)$" { 0 }
-small -> r"[0-9]{1,2}$" { int(_[0]) }
+small_num -> r"[0-9]{1,2}$" { int(_[0]) }
     | ones
     | zero ones { _[1] }
     | teen
     | tens
     | tens ones { _[0] + _[1] }
-ones -> "one" { 1 }
+    | tens "-" ones { _[0] + _[2] }
+small -> small_num
     | r"^an?$" { 1 }
+ones -> "one" { 1 }
     | "two" { 2 }
     | "three" { 3 }
     | "four" { 4}
@@ -305,11 +318,7 @@ mod -> approx timex { Mod("APPROX", _[1]) }
     | timex on_or_before { Mod("ON_OR_BEFORE", _[0]) }
     | timex on_or_after { Mod("ON_OR_AFTER", _[0]) }
 
-approx -> "a" "couple"
-    | "a" "couple" "of"
-    | "few" 
-    | "a" "few"
-    | "about"
+approx -> "about"
     | "around"
 
 equal_or_less -> "nearly"
@@ -342,8 +351,9 @@ start -> "early"
     | "the" "beginning" "of"
     
 mid -> "mid"
-    | "the" "mid"
-    | "the" "middle" "of"
+    | "mid" "-"
+    | "middle" "of"
+    | dt_any mid
 
 on_or_before -> "or" "earlier"
     | "or" "sooner"
@@ -387,43 +397,73 @@ indef_past -> "recent"
     | "recent" plural_unit
     | "previous" plural_unit
     | "past" plural_unit
-    | "a" "while" "ago"
-    | r"^an?" adj_phrase "while" "ago"
-    | r"^an?" adj_phrase "time" "ago"
-    | dt adj_phrase "past"
-    | dt "past"
+    | dt_any "while" "ago"
+    | dt_any "time" "ago"
+    | dt_any "past"
     | "past"
     | "last" "time"
     | "the" "last" "time"
+    | "the" "last" generic_plural
+    | "the" "next" generic_plural
+    | "coming" generic_plural
+    | "the" "coming" generic_plural
 
 indef_future -> "soon"
-    | dt Any() "future"
-    | dt "future"
+    | dt_any "future"
     | "next" "time"
     | dt "next" "time"
     | "later"
     | adv "later"
+    | "a" "later" "time"
+    | "a" "later" "date"
+    | r"an?" adv "later" "time"
+    | r"an?" adv "later" "date"
     
 indef_duration -> dt "time"
     | "a" "while"
-    | r"^an?" Any() "while"
-    | dt "period"
+    | dt_any "while"
+    | dt_any "period"
+    | dem_any "period"
     
-wsj_expressions -> dt_any bare_unit "ago" "period" { PastAnchoredTimePoint(Duration() | _[1](1))(Deictic()) }
-    | dt_any bare_unit "earlier" "period" { PastAnchoredTimePoint(Duration() | _[1](1))(Anaphoric()) }
-    | dt_any bare_unit "ago" bare_unit { CoercedTimePoint(PastAnchoredTimePoint(Duration() | _[1](1))(Deictic()), _[3]) }
-    | dt_any bare_unit "earlier" bare_unit { CoercedTimePoint(PastAnchoredTimePoint(Duration() | _[1](1))(Anaphoric()), _[3]) }
-    | dt_any bare_unit "ago" duration { CoercedTimePoint(PastAnchoredTimePoint(_[1])(Deictic()), _[3]) }
-    | dt_any bare_unit "earlier" duration { CoercedTimePoint(PastAnchoredTimePoint(_[1])(Anaphoric()), _[3]) }
+indef_timepoint -> demonstr r"times?"
+    | dt_any r"moments?"
+    | dem_any r"moments?"
+    
+wsj_expression -> unit_ago "period" { PastAnchoredTimePoint(Duration() | _[0](1))(Deictic()) }
+    | unit_earlier "period" { PastAnchoredTimePoint(Duration() | _[0](1))(Anaphoric()) }
+    | unit_ago bare_unit { CoercedTimePoint(PastAnchoredTimePoint(Duration() | _[0](1))(Deictic()), _[1]) }
+    | unit_earlier bare_unit { CoercedTimePoint(PastAnchoredTimePoint(Duration() | _[0](1))(Anaphoric()), _[1]) }
+    | dt_any wsj_expression { _[1] }
+    | dem_any wsj_expression { _[1] }
+    | unit_ago { PastAnchoredTimePoint(Duration() | _[0](1))(Deictic()) }
+    | unit_earlier { PastAnchoredTimePoint(Duration() | _[0](1))(Anaphoric()) }
+    
+unit_ago -> bare_unit "ago" { _[0] }
+    | bare_unit "-" "ago" { _[0] }
+unit_earlier -> bare_unit "earlier" { _[0] }
+    | bare_unit "-" "earlier" { _[0] }
+    
+adjectival_timex -> small "-" bare_unit { Duration() | _[2](_[0]) }
+    | adjectival_timex "-" "old" { _[0] }
+    
+generic_plural -> plural_unit { GenericPlural(_[0]) }
+    | some plural_unit { GenericPlural(_[1]) }
+    | dt plural_unit { GenericPlural(_[1]) }
+    | cardinal "to" cardinal plural_unit { GenericPlural(_[3]) }
+    | plural_unit "or" plural_unit { Duration() }
+    
+do_not_parse -> small "years" "old" { DoNotParse(map(str, _)) }
     
 adj_phrase -> adj
     | adj_phrase adj
     | adj adj_phrase
     | adv adj
 
-few -> "few"
-    | "couple"
-    | "couple" "of"
+some -> "some"
+    | "few"
+    | "a" "few"
+    | "a" "couple"
+    | "a" "couple" "of"
     | "several"
 
 adj -> "/jj"
@@ -433,9 +473,12 @@ adv -> "/rb"
     | "least"
     | "more"
     | "less"
+    | r".*ly$"
 dt -> "/dt"
     | "a"
     | "an"
     | "the"
-dt_any -> dt | dt Any()
+demonstr -> "this" | "that" | "these" | "those"
+dem_any -> demonstr | demonstr Any() | demonstr adv Any()
+dt_any -> dt | dt Any() | dt adv Any()
 modal -> "/md"

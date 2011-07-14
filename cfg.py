@@ -22,11 +22,11 @@ class Terminal(object):
 
 class Literal(Terminal):
     def __init__(self, lit):
-        self.lit = unicode(lit)
+        self.lit = unicode(lit).lower()
 
     def match(self, token):
         if not isinstance(token, basestring): return False
-        return token and self.lit == unicode(token_word(token))
+        return token and self.lit == unicode(token_word(token)).lower()
 
     def __repr__(self):
         return "Literal(%r)" % self.lit
@@ -50,13 +50,13 @@ class POSTerminal(Terminal):
 
 class RegexpTerminal(Terminal):
     def __init__(self, pattern, name=None, flags=re.UNICODE):
-        self.pattern = re.compile(pattern, flags)
+        self.pattern = re.compile(pattern.lower(), flags)
         self.name = name or pattern
 
     def match(self, token):
         if not isinstance(token, basestring): return False
         return token is not None and \
-               self.pattern.match(unicode(token_word(token)))
+               self.pattern.match(unicode(token_word(token.lower())))
 
     def __str__(self):
         return self.name
@@ -81,13 +81,12 @@ class Abbrev(Terminal):
         assert (isinstance(string, basestring) and
                 isinstance(min_prefix_len, int) and
                 min_prefix_len > 0)
-        self.string = string
+        self.string = string.lower()
         self.min = min_prefix_len
 
     def match(self, token):
-        if token is None:
-            return False
-        string = unicode(token_word(token))
+        if not isinstance(token, basestring): return False
+        string = unicode(token_word(token.lower()))
         return (len(string) >= self.min and
                 self.string.startswith(string.rstrip(".")))
 
