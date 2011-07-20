@@ -1,5 +1,6 @@
 from decimal import Decimal
 import re
+import codecs
 
 from cfg import *
 from earley import Parser
@@ -74,12 +75,25 @@ class GreaterThan(Terminal):
             return False
 
 class Exact(Terminal):
+    """i.e. preserving case when checking for a match."""
     def __init__(self, lit):
         self.lit = unicode(lit)
     
     def match(self, token):
         if not isinstance(token, basestring): return False
         return token and self.lit == unicode(token_word(token))
+
+f = codecs.open('timex-grammar.txt', mode='r', encoding='UTF-8')
+raw = f.read()
+f.close()
+literals = set([lit[2:-2] for lit in re.findall(r'\s\"[A-Za-z]*?\"\s', raw)])
+
+class Other(Terminal):
+    """Matches strings NOT found in the grammar."""
+    def __init__(self): pass
+
+    def match(self, token):
+        return token.lower() in literals
 
 # Temporal functions.
             
@@ -183,7 +197,7 @@ class FutureAnchoredTimePoint(AnchoredTimePoint):
         else:
             return "(%s)LATER" % self.duration
 
-class PreviousOrFollowing(TemporalFunction):
+class IncrementOrDecrement(TemporalFunction):
     def __call__(self, anchor):
         if not (self.anchor and isinstance(self.anchor, TemporalFunction)):
             self.anchor = anchor
@@ -195,21 +209,21 @@ class PreviousOrFollowing(TemporalFunction):
         self.unit = unit
         self.anchor = None
 
-class Previous(PreviousOrFollowing):
+class Decrement(IncrementOrDecrement):
     def __str__(self):
         if self.anchor:
-            return "PREVIOUS(%s)FROM(%s)" % (self.unit.__name__, self.anchor)
+            return "(%s)DECREMENTED_BY(%s)" % (self.anchor, self.unit.__name__)
         else:
-            return "PREVIOUS(%s)" % self.unit.__name__
+            return "DECREMENT_BY(%s)" % self.unit.__name__
 
-class Following(PreviousOrFollowing):
+class Increment(IncrementOrDecrement):
     def __str__(self):
         if self.anchor:
-            return "(%s)FOLLOWING(%s)" % (self.unit.__name__, self.anchor)
+            return "(%s)INCREMENTED_BY(%s)" % (self.anchor, self.unit.__name__)
         else:
-            return "FOLLOWING(%s)" % self.unit.__name__
+            return "INCREMENT_BY(%s)" % self.unit.__name__
 
-class FindNextOrLast(TemporalFunction):
+class NextOrLastInstance(TemporalFunction):
     def __call__(self, anchor):
         if not (self.anchor and isinstance(self.anchor, TemporalFunction)):
             self.anchor = anchor
@@ -221,19 +235,19 @@ class FindNextOrLast(TemporalFunction):
         self.timepoint = timepoint
         self.anchor = None
 
-class FindNext(FindNextOrLast):
+class NextInstance(NextOrLastInstance):
     def __str__(self):
         if self.anchor:
-            return "(%s)FIND_NEXT(%s)" % (self.timepoint, self.anchor)
+            return "NEXT(%s)AFTER(%s)" % (self.timepoint, self.anchor)
         else:
-            return "FIND_NEXT(%s)" % self.timepoint
+            return "NEXT_INSTANCE_OF(%s)" % self.timepoint
 
-class FindLast(FindNextOrLast):
+class LastInstance(NextOrLastInstance):
     def __str__(self):
         if self.anchor:
-            return "(%s)FIND_LAST(%s)" % (self.timepoint, self.anchor)
+            return "LAST(%s)BEFORE(%s)" % (self.timepoint, self.anchor)
         else:
-            return "FIND_LAST(%s)" % self.timepoint    
+            return "LAST_INSTANCE_OF(%s)" % self.timepoint    
 
 class CoercedTimePoint(TemporalFunction):
     def __init__(self, timepoint, unit):
@@ -264,12 +278,8 @@ class TemporalModifier(TemporalFunction):
 class Mod(TemporalModifier): pass
 
 class Freq(TemporalModifier): 
-    def __init__(self, frequency, interval):
-        self.frequency = frequency
-        self.interval = interval
-
     def __str__(self):
-        return '%sx_PER(%s)' % (self.frequency, self.interval)
+        return '%sx_PER(%s)' % (self.modifier, self.timex)
 
 class Quant(TemporalModifier):
     def __init__(self, modifier, timex):
@@ -277,6 +287,9 @@ class Quant(TemporalModifier):
         self.timex = timex
 
 class DoNotParse(object):
+    """In the grammar, you can use this class to modify objects (i.e.
+       anchoring temporal functions) without 'consuming' them - the parse
+       method knows to 'flatten' these.""" 
     def __init__(self, dontparse):
         self.dontparse = dontparse
 
@@ -294,7 +307,10 @@ def normalize_space(s):
 
 def mmddyyyy_to_date(token):
     tokens = re.findall(r'\d+', token)
-    return CalendarDate(tokens[2], tokens[0], tokens[1])
+    year = int(tokens[2])
+    if year < 20: year += 2000
+    elif year < 100: year += 1900
+    return CalendarDate(year, tokens[0], tokens[1])
 
 def mmdd_to_date(token):
     tokens = re.findall(r'\d+', token)
@@ -336,16 +352,11 @@ def sentences(s):
         yield s[i:j]
 
 def tokenize(text):
+    """Flattens the output of tml_tokenize (i.e. no sentence tokenization)."""
     sents = [t for t in tml_tokenize(text)]
     toks = []
     for s in sents: toks.extend(s)
     return toks
-##    """Produce a list of tokens from the given sentence (a string).
-##
-##    This implementation is dead simple, and is not meant for production use.
-##    It assumes normalized input."""
-##    return [word.lower().rstrip(".,;:!")
-##            for word in sentence.replace("-", " ").split(" ")]
 
 def parse(tokens, grammar=read_timex_grammar()):
     tokens = list(tokens)

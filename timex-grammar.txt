@@ -5,7 +5,6 @@ timex -> present { Deictic() }
 	| coerced_timepoint
     | timepoint
     | interval
-    | mod
     | quant
     | freq
     | wsj_expression
@@ -21,12 +20,14 @@ timepoint -> date
     | month_and_day
     | year_and_week
     | quarter
-    | anchored_time_point
-    | previous_or_following
-    | find_next_or_last
+    | anchored_timepoint
+    | coerced_timepoint
+    | increment_or_decrement
+    | next_or_last_instance
     | date time { _[0] | _[1] }
     | month year { _[1] | _[0] } 
     | indef_timepoint { IndefTimePoint() }
+    | mod_timepoint
 
 present -> "now"
     | "right" "now"
@@ -40,23 +41,23 @@ present -> "now"
     | "present" "time"
     | "the" "present" "time"
     
-previous_or_following -> last_deictic "week" { Previous(Week)(Deictic()) }
-    | last_deictic "month" { Previous(Month)(Deictic()) }
-    | last_deictic "year" { Previous(Year)(Deictic()) }
-    | next_deictic "week" { Following(Week)(Deictic()) }
-    | next_deictic "month" { Following(Month)(Deictic()) }
-    | next_deictic "year" { Following(Year)(Deictic()) }
-    | last_anaphoric "week" { Previous(Week)(Anaphoric()) }
-    | last_anaphoric "month" { Previous(Month)(Anaphoric()) }
-    | last_anaphoric "year" { Previous(Year)(Anaphoric()) }
-    | next_anaphoric "week" { Following(Week)(Anaphoric()) }
-    | next_anaphoric "month" { Following(Month)(Anaphoric()) }
-    | next_anaphoric "year" { Following(Year)(Anaphoric()) }
-    | "yesterday" { Previous(Day)(Deictic()) }
-    | "tomorrow" { Following(Day)(Deictic()) }
+increment_or_decrement -> last_deictic "week" { Decrement(Week)(Deictic()) }
+    | last_deictic "month" { Decrement(Month)(Deictic()) }
+    | last_deictic "year" { Decrement(Year)(Deictic()) }
+    | next_deictic "week" { Increment(Week)(Deictic()) }
+    | next_deictic "month" { Increment(Month)(Deictic()) }
+    | next_deictic "year" { Increment(Year)(Deictic()) }
+    | last_anaphoric "week" { Decrement(Week)(Anaphoric()) }
+    | last_anaphoric "month" { Decrement(Month)(Anaphoric()) }
+    | last_anaphoric "year" { Decrement(Year)(Anaphoric()) }
+    | next_anaphoric "week" { Increment(Week)(Anaphoric()) }
+    | next_anaphoric "month" { Increment(Month)(Anaphoric()) }
+    | next_anaphoric "year" { Increment(Year)(Anaphoric()) }
+    | "yesterday" { Decrement(Day)(Deictic()) }
+    | "tomorrow" { Increment(Day)(Deictic()) }
     
-find_next_or_last -> last_deictic timepoint { FindLast(_[1])(Deictic()) }
-    | next_deictic timepoint { FindNext(_[1])(Deictic()) }
+next_or_last_instance -> last_deictic timepoint { LastInstance(_[1])(Deictic()) }
+    | next_deictic timepoint { NextInstance(_[1])(Deictic()) }
 
 coerced_timepoint -> "today" { CoercedTimePoint(Deictic(), Day) }
     | "this" bare_unit { CoercedTimePoint(Deictic(), _[1]) }
@@ -136,11 +137,11 @@ month_and_day -> month day { Month(_[0]) | DayOfMonth(_[1]) }
 year -> GreaterThan(1799) { Year(_[0]) }
     | r"^(18|19|20)\d{2}$" { Year(_[0]) }
     | "the" "year" number { Year(_[2]) }
-    | teen small { Year((_[0] * 100) + _[1]) }
-    | teen "and" small { Year((_[0] * 100) + _[2]) }
+    | teen small_num { Year((_[0] * 100) + _[1]) }
+    | teen "and" small_num { Year((_[0] * 100) + _[2]) }
     | "two" "thousand" { Year(2000) }
-    | "two" "thousand" small { Year(2000 + _[2]) }
-    | "two" "thousand" "and" small { Year(2000 + _[3]) }
+    | "two" "thousand" small_num { Year(2000 + _[2]) }
+    | "two" "thousand" "and" small_num { Year(2000 + _[3]) }
 
 year_and_week -> ordinal "week" "of" year { Year(_[3]) | Week(_[0]) }
     | "the" ordinal "week" "of" year { Year(_[4]) | Week(_[1]) }
@@ -163,7 +164,7 @@ anchored_interval -> "the" "past" duration { PastAnchoredInterval(_[2]) }
     | "the" "next" duration { FutureAnchoredInterval(_[2]) }
     | "the" "coming" duration { FutureAnchoredInterval(_[2]) }
     
-anchored_time_point -> duration "ago" { PastAnchoredTimePoint(_[0])(Deictic()) }
+anchored_timepoint -> duration "ago" { PastAnchoredTimePoint(_[0])(Deictic()) }
     | duration "earlier" { PastAnchoredTimePoint(_[0])(Anaphoric()) }
     | duration "afterwards" { FutureAnchoredTimePoint(_[0])(Anaphoric()) }
     | duration "later" { FutureAnchoredTimePoint(_[0]) }
@@ -173,7 +174,9 @@ duration -> period { Duration() | _[0] }
     | duration period { _[0] | _[1] }
     | duration "and" period { _[0] | _[2] }
     | duration "period" { _[0] }
-    | dt_any duration { _[1] }
+    | the_any duration { _[1] }
+    | generic_plural
+    | mod_duration
 
 period -> number r"seconds?" { Seconds(_[0]) }
     | number r"minutes?" { Minutes(_[0]) }
@@ -216,6 +219,7 @@ number -> r"[0-9]+$" { int(_[0]) }
     | cardinal
     | number "and" fraction { _[0] + _[2] }
 
+strictly_cardinal -> zero | small_num | hundreds | thousands
 cardinal -> zero | small | hundreds | thousands
 zero -> "0" { 0 }
     | r"(zero|oh?|n?[ao]ught)$" { 0 }
@@ -255,20 +259,20 @@ tens -> "twenty" { 20 }
     | "seventy" { 70 }
     | "eighty" { 80 }
     | "ninety" { 90 }
-hundreds -> small "hundred" { _[0] * 100 }
-    | small "hundred" small { (_[0] * 100) + _[2] }
-    | small "hundred" "and" small { (_[0] * 100) + _[3] }
-thousands -> small small { _[0] * 100 + _[1] }
-    | small "thousand" { _[0] * 1000 }
-    | small "thousand" small { (_[0] * 1000) + _[2] }
-    | small "thousand" "and" small { (_[0] * 1000) + _[3] }
-    | small "thousand" hundreds { (_[0] * 1000) + _[2] }
+hundreds -> small_num "hundred" { _[0] * 100 }
+    | small_num "hundred" small_num { (_[0] * 100) + _[2] }
+    | small_num "hundred" "and" small_num { (_[0] * 100) + _[3] }
+thousands -> small_num small_num { _[0] * 100 + _[1] }
+    | small_num "thousand" { _[0] * 1000 }
+    | small_num "thousand" small_num { (_[0] * 1000) + _[2] }
+    | small_num "thousand" "and" small_num { (_[0] * 1000) + _[3] }
+    | small_num "thousand" hundreds { (_[0] * 1000) + _[2] }
     | hundreds "thousand" { _[0] * 1000 }
-    | hundreds "thousand" small { (_[0] * 1000) + _[2] }
-    | hundreds "thousand" "and" small { (_[0] * 1000) + _[3] }
+    | hundreds "thousand" small_num { (_[0] * 1000) + _[2] }
+    | hundreds "thousand" "and" small_num { (_[0] * 1000) + _[3] }
     | hundreds "thousand" hundreds { (_[0] * 1000) + _[2] }
-    | teen small { (_[0] * 100) + _[1] }
-    | teen "and" small { (_[0] * 100) + _[2] }
+    | teen small_num { (_[0] * 100) + _[1] }
+    | teen "and" small_num { (_[0] * 100) + _[2] }
 
 ordinal -> ord_ones | ord_small 
 ord_small -> r"[0-9]+(st|nd|rd|th)" { int(_[0][:-2]) }
@@ -304,19 +308,20 @@ ord_tens -> "twentieth" { 20 }
     | "eightieth" { 80 }
     | "ninetieth" { 90 }
 
-mod -> approx timex { Mod("APPROX", _[1]) }
-    | timex "or" "so" { Mod("APPROX", _[0]) }
-    | equal_or_less timex { Mod("EQUAL_OR_LESS", _[1]) } 
-    | timex "or" "less" { Mod("EQUAL_OR_LESS", _[0]) } 
-    | equal_or_more timex { Mod("EQUAL_OR_MORE", _[1]) } 
-    | timex "or" "more" { Mod("EQUAL_OR_MORE", _[0]) } 
-    | less_than timex { Mod("LESS_THAN", _[1]) }
-    | more_than timex { Mod("MORE_THAN", _[1]) }
-    | start timex { Mod("START", _[1]) }
-    | end timex { Mod("END", _[1]) }
-    | mid timex { Mod("MID", _[1]) }
-    | timex on_or_before { Mod("ON_OR_BEFORE", _[0]) }
-    | timex on_or_after { Mod("ON_OR_AFTER", _[0]) }
+mod_duration -> approx duration { Mod("APPROX", _[1]) }
+    | duration "or" "so" { Mod("APPROX", _[0]) }
+    | equal_or_less duration { Mod("EQUAL_OR_LESS", _[1]) } 
+    | duration "or" "less" { Mod("EQUAL_OR_LESS", _[0]) } 
+    | equal_or_more duration { Mod("EQUAL_OR_MORE", _[1]) } 
+    | duration "or" "more" { Mod("EQUAL_OR_MORE", _[0]) } 
+    | less_than duration { Mod("LESS_THAN", _[1]) }
+    | more_than duration { Mod("MORE_THAN", _[1]) }
+    
+mod_timepoint -> start timepoint { Mod("START", _[1]) }
+    | end timepoint { Mod("END", _[1]) }
+    | mid timepoint { Mod("MID", _[1]) }
+    | timepoint on_or_before { Mod("ON_OR_BEFORE", _[0]) }
+    | timepoint on_or_after { Mod("ON_OR_AFTER", _[0]) }
 
 approx -> "about"
     | "around"
@@ -394,9 +399,10 @@ indef_past -> "recent"
     | "former"
     | "formerly"
     | "earlier"
-    | "recent" plural_unit
-    | "previous" plural_unit
-    | "past" plural_unit
+    | "earlier" generic_plural
+    | "recent" generic_plural
+    | "previous" generic_plural
+    | "past" generic_plural
     | dt_any "while" "ago"
     | dt_any "time" "ago"
     | dt_any "past"
@@ -413,6 +419,9 @@ indef_future -> "soon"
     | "next" "time"
     | dt "next" "time"
     | "later"
+    | "later" generic_plural
+    | "coming" generic_plural
+    | "the" "coming" generic_plural
     | adv "later"
     | "a" "later" "time"
     | "a" "later" "date"
@@ -443,16 +452,24 @@ unit_ago -> bare_unit "ago" { _[0] }
 unit_earlier -> bare_unit "earlier" { _[0] }
     | bare_unit "-" "earlier" { _[0] }
     
-adjectival_timex -> small "-" bare_unit { Duration() | _[2](_[0]) }
+adjectival_timex -> small_num "-" bare_unit { Duration() | _[2](_[0]) }
     | adjectival_timex "-" "old" { _[0] }
     
-generic_plural -> plural_unit { GenericPlural(_[0]) }
+generic_plural -> "seconds" { GenericPlural(Seconds) }
+    | "minutes" { GenericPlural(Minutes) }
+    | "hours" { GenericPlural(Hours) }
+    | "days" { GenericPlural(Days) }
+    | "weeks" { GenericPlural(Weeks) }
+    | "months" { GenericPlural(Months) }
+    | "years" { GenericPlural(Years) }
     | some plural_unit { GenericPlural(_[1]) }
     | dt plural_unit { GenericPlural(_[1]) }
     | cardinal "to" cardinal plural_unit { GenericPlural(_[3]) }
     | plural_unit "or" plural_unit { Duration() }
+    | plural_unit "and" plural_unit { Duration() }
+    | "a" bare_unit "or" "two" { Duration() }
     
-do_not_parse -> small "years" "old" { DoNotParse(map(str, _)) }
+do_not_parse -> small_num "years" "old" { DoNotParse(map(str, _)) }
     
 adj_phrase -> adj
     | adj_phrase adj
@@ -464,9 +481,11 @@ some -> "some"
     | "a" "few"
     | "a" "couple"
     | "a" "couple" "of"
+    | "couple" "of"
     | "several"
 
 adj -> "/jj"
+
 adv -> "/rb"
     | "very"
     | "most"
@@ -474,11 +493,18 @@ adv -> "/rb"
     | "more"
     | "less"
     | r".*ly$"
+    
 dt -> "/dt"
     | "a"
     | "an"
     | "the"
+    
 demonstr -> "this" | "that" | "these" | "those"
+
 dem_any -> demonstr | demonstr Any() | demonstr adv Any()
+
 dt_any -> dt | dt Any() | dt adv Any()
+
+the_any -> "the" | "the" Any() | "the" adv Any()
+
 modal -> "/md"

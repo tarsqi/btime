@@ -7,6 +7,8 @@ from timex import *
 from read_tml import *
 from copy import *
 
+# Don't get confused - these are TERMINALS for the anaphoric grammar.
+
 class Anaphoric(Terminal):
     def __init__(self):
         pass
@@ -19,11 +21,11 @@ class Anaphoric(Terminal):
 
 class Signal(Terminal):
     def __init__(self, word=None):
-        self.word = word
+        self.word = word.lower()
 
     def match(self, token):
         if isinstance(token, XMLTag) and token.type == 'SIGNAL':
-            if self.word: return self.word == token.text
+            if self.word: return self.word == token.text.lower()
             else: return True
         return False
 
@@ -35,13 +37,30 @@ class Timex(Terminal):
         return isinstance(token, (TemporalFunction, Anchor,
                                   iso8601.TimeRep, iso8601.TimeUnit))
 
-def anchor_type(rep):
-    if isinstance(rep, Anchor) or isinstance(rep, iso8601.TimeRep):
-        return type(Anchor)
-    elif not isinstance(rep, TemporalFunction):
-        return None
-    else:
-        return anchor_type(rep.anchor)
+class HybridClassifier(object):
+    def __init__(self, anchor_classifier, anchored_classifier,
+                       anchor_features=anchor_features,
+                       anchored_features=anchored_features):
+        self.anchor_classifier = anchor_classifier
+        self.anchored_classifier = anchored_classifier
+        self.anchor_features = anchor_features
+        self.anchored_features = anchored_features
+
+    def classify(doc):
+        tids = [x[0] for x in doc.timexes]
+
+def anchor_type(timex):
+    if isinstance(timex, Anchor): return type(timex)
+    elif isinstance(timex, TemporalModifier): return anchor_type(timex.timex)
+    elif isinstance(timex, TemporalFunction):
+        try:
+            return anchor_type(timex.anchor)
+        except AttributeError:
+            pass
+
+def timex_type(timex):
+    if isinstance(timex, TemporalModifier): return timex_type(timex.timex)
+    elif isinstance(timex, TemporalFunction): return type(timex)
 
 def strip_timexes(doc_):
     doc = deepcopy(doc_)
@@ -72,8 +91,8 @@ def get_tml_files(directory=tml_dir):
         if f.endswith('.tml'):
             yield TMLFile(tml_dir + '/' + f)
 
-def doc_features(doc, add_labels=True, timex_window=[-3,-2,-1,1],
-                                       token_window=[-1,1]):
+def anchored_features(doc, add_labels=True, timex_window=[-4,-3,-2,-1,1,2],
+                                            token_window=[-2,-1,1,2]):
     feature_sets = []
     for i in range(len(doc.timexes)):
         x, y = doc.timexes[i][1]
@@ -87,20 +106,53 @@ def doc_features(doc, add_labels=True, timex_window=[-3,-2,-1,1],
         for j in timex_window:
             if i+j > 0 and i+j < len(doc.timexes):
                  features.update(prefixed_dict(
-                                 token_features(get_timex(doc, i+j)),
+                                 token_features(timex_num(doc, i+j)),
                                  'timex_%d' % j))
         if add_labels:
-            if not timex['anchorTimeID']:
+            if not anchored(timex):
                 label = 'UNANCHORED'
-            elif timex['anchorTimeID'] == doc.creation_id:
-                label = 'DEICTIC'
+            elif anchored(timex) == doc.creation_id:
+                label = 'CREATION'
             else:
-                tids = map(lambda x: x[0], doc.timexes)
-                label = tids.index(timex['tid']) - \
-                        tids.index(timex['anchorTimeID'])
+                label = 'REF_TIME'
             features = (features, label)
         feature_sets.append(features)
     return feature_sets
+
+def anchor_features(doc, add_labels=True, timex_window=[-3,-2,-1,1],
+                                          token_window=[-1,1]):
+    feature_sets = []
+    if add_labels:
+        anchors = set()
+        for i in range(len(doc.timexes)):
+            x, y = doc.timexes[i][1]
+            timex = doc.sentences[x][y]
+            if anchored(timex): anchors.add(anchored(timex))
+    for i in range(len(doc.timexes)):
+        x, y = doc.timexes[i][1]
+        timex = doc.sentences[x][y]
+        features = token_features(timex)
+        for j in token_window:
+            if y+j > 0 and y+j < len(doc.sentences[x]):
+                 features.update(prefixed_dict(
+                                 token_features(doc.sentences[x][y+j]),
+                                 'token_%d' % j))
+        for j in timex_window:
+            if i+j > 0 and i+j < len(doc.timexes):
+                 features.update(prefixed_dict(
+                                 token_features(timex_num(doc, i+j)),
+                                 'timex_%d' % j))
+        if add_labels:
+            if timex['tid'] in anchors:
+                label = 'ANCHOR'
+            else:
+                label = 'NOT_AN_ANCHOR'
+            features = (features, label)
+        feature_sets.append(features)
+    return feature_sets
+
+def anchored(timex):
+    return timex['anchorTimeID'] or timex['beginPoint'] or timex['endPoint']
 
 def get_timex(doc, tid):
     for timex in doc.timexes:
@@ -109,21 +161,27 @@ def get_timex(doc, tid):
             return doc.sentences[x][y]
     return None
 
+def timex_num(doc, num):
+    x, y = doc.timexes[num][1]
+    return doc.sentences[x][y]
+
 def token_features(token):
     features = {}
     if isinstance(token, XMLTag):
         if token.type == 'TIMEX3':
             try:
-                pgen = parse(tokenize(token.text))
+                tokens = tokenize(token.text)
+                features['last_token'] = (re.sub(r'\d', '#',
+                                                 tokens[-1])).lower()
+                pgen = parse(tokens)
                 timex_objects = [p for p in pgen]
-                features['type'] = type(timex_objects[-1]).__name__
+                features['timex_type'] = timex_type(timex_objects[-1]).__name__
+                features['anchor_type'] = anchor_type(timex_objects[-1]).__name__
             except Exception:
-                features['type'] = 'n/a'
-        else:
-            features['type'] = token.type
-            features['text'] = token.text
-    else:
-        features['text'] = token
+                features['timex_type'] = 'TIMEX'
+        elif token.type == 'SIGNAL':
+            features['signal'] = True
+            features['signal_text'] = token.text
     return features
 
 def prefixed_dict(dictionary, prefix):
