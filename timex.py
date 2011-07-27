@@ -105,6 +105,10 @@ class TemporalFunction(object):
     def __str__(self):
         return "%s()" % self.__class__.__name__.upper()
 
+class PastRef(TemporalFunction): pass
+
+class FutureRef(TemporalFunction): pass
+
 class AnchoredTimex(TemporalFunction):
     def __init__(self, timex, anchor):
         self.timex = timex
@@ -130,19 +134,19 @@ class AnchoredInterval(TemporalFunction):
         self.duration = duration
         self.anchor = None
 
-class PastAnchoredInterval(AnchoredInterval):
+class PastAnchoredInterval(AnchoredInterval, PastRef):
     def __str__(self):
         if self.anchor:
-            return "PAST(%s)BEFORE(%s)" % (self.duration, self.anchor)
+            return "THE_PAST(%s)BEFORE(%s)" % (self.duration, self.anchor)
         else:
-            return "PAST(%s)" % self.duration
+            return "THE_PAST(%s)" % self.duration
 
-class FutureAnchoredInterval(AnchoredInterval):
+class FutureAnchoredInterval(AnchoredInterval, FutureRef):
     def __str__(self):
         if self.anchor:
-            return "NEXT(%s)AFTER(%s)" % (self.duration, self.anchor)
+            return "THE_NEXT(%s)AFTER(%s)" % (self.duration, self.anchor)
         else:
-            return "NEXT(%s)" % self.duration
+            return "THE_NEXT(%s)" % self.duration
 
 class IndefReference(TemporalFunction):
     def __init__(self):
@@ -152,11 +156,11 @@ class IndefReference(TemporalFunction):
         self.anchor = anchor
         return self
 
-class IndefPast(IndefReference): 
+class IndefPast(IndefReference, PastRef): 
     def __str__(self):
         return "INDEF_PAST"
 
-class IndefFuture(IndefReference): 
+class IndefFuture(IndefReference, FutureRef): 
     def __str__(self):
         return "INDEF_FUTURE"
 
@@ -183,14 +187,14 @@ class AnchoredTimePoint(TemporalFunction):
         self.duration = duration
         self.anchor = None
 
-class PastAnchoredTimePoint(AnchoredTimePoint):
+class PastAnchoredTimePoint(AnchoredTimePoint, PastRef):
     def __str__(self):
         if self.anchor:
             return "(%s)BEFORE(%s)" % (self.duration, self.anchor)
         else:
             return "(%s)EARLIER" % self.duration
 
-class FutureAnchoredTimePoint(AnchoredTimePoint):
+class FutureAnchoredTimePoint(AnchoredTimePoint, FutureRef):
     def __str__(self):
         if self.anchor:
             return "(%s)AFTER(%s)" % (self.duration, self.anchor)
@@ -209,14 +213,14 @@ class IncrementOrDecrement(TemporalFunction):
         self.unit = unit
         self.anchor = None
 
-class Decrement(IncrementOrDecrement):
+class Decrement(IncrementOrDecrement, PastRef):
     def __str__(self):
         if self.anchor:
             return "(%s)DECREMENTED_BY(%s)" % (self.anchor, self.unit.__name__)
         else:
             return "DECREMENT_BY(%s)" % self.unit.__name__
 
-class Increment(IncrementOrDecrement):
+class Increment(IncrementOrDecrement, FutureRef):
     def __str__(self):
         if self.anchor:
             return "(%s)INCREMENTED_BY(%s)" % (self.anchor, self.unit.__name__)
@@ -235,14 +239,14 @@ class NextOrLastInstance(TemporalFunction):
         self.timepoint = timepoint
         self.anchor = None
 
-class NextInstance(NextOrLastInstance):
+class NextInstance(NextOrLastInstance, FutureRef):
     def __str__(self):
         if self.anchor:
             return "NEXT(%s)AFTER(%s)" % (self.timepoint, self.anchor)
         else:
             return "NEXT_INSTANCE_OF(%s)" % self.timepoint
 
-class LastInstance(NextOrLastInstance):
+class LastInstance(NextOrLastInstance, PastRef):
     def __str__(self):
         if self.anchor:
             return "LAST(%s)BEFORE(%s)" % (self.timepoint, self.anchor)
@@ -351,13 +355,6 @@ def sentences(s):
     if i < n and i < j:
         yield s[i:j]
 
-def tokenize(text):
-    """Flattens the output of tml_tokenize (i.e. no sentence tokenization)."""
-    sents = [t for t in tml_tokenize(text)]
-    toks = []
-    for s in sents: toks.extend(s)
-    return toks
-
 def parse(tokens, grammar=read_timex_grammar()):
     tokens = list(tokens)
     parser = Parser(grammar)
@@ -374,3 +371,52 @@ def parse(tokens, grammar=read_timex_grammar()):
             del tokens[0:len(list(tree.leaves()))]
         except StopIteration:
             yield tokens.pop(0)
+
+def anchored(timex):
+    return timex['anchorTimeID'] or timex['beginPoint'] or timex['endPoint']
+
+def anchor_type(timex):
+    if isinstance(timex, Anchor): return type(timex)
+    elif isinstance(timex, TemporalModifier): return anchor_type(timex.timex)
+    elif isinstance(timex, TemporalFunction):
+        try:
+            return anchor_type(timex.anchor)
+        except AttributeError:
+            pass
+
+def anchoring_type(timex):
+    if timex['anchorTimeID']: return 'ANCHOR'
+    elif timex['beginPoint']: return 'BEGIN'
+    elif timex['endPoint']: return 'END'
+
+def timex_type(timex):
+    if isinstance(timex, TemporalModifier): return timex_type(timex.timex)
+    else: return type(timex)
+
+def granularity(timex):
+    if timex.__module__ == 'iso8601.iso8601':
+        cls = None
+        if isinstance(timex, Duration):
+            for unit in timex.elements:
+                if unit.value:
+                    cls = type(unit)
+                    break
+        else:
+            cls = type(timex)
+        if not cls: return 'Undefined'
+        for timex_type in [Day, Year, Month, Quarter, Week, Hour, Minute,
+                           Second, Date]:
+            if issubclass(cls, timex_type): return timex_type.__name__
+        return 'Undefined'
+    elif isinstance(timex, (AnchoredTimex,
+                            TemporalModifier)):
+        return granularity(timex.timex)
+    elif isinstance(timex, (AnchoredInterval,
+                            AnchoredTimePoint)):
+        return granularity(timex.duration)
+    elif isinstance(timex, (GenericPlural,
+                            IncrementOrDecrement,
+                            CoercedTimePoint)):
+        return granularity(timex.unit)
+    elif isinstance(timex, NextOrLastInstance):
+        return granularity(timex.timepoint)

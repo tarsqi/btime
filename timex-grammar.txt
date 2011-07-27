@@ -1,4 +1,5 @@
 timex -> present { Deictic() } 
+    | anaphoric { Anaphoric() }
     | indef_past { IndefPast() }
 	| indef_future { IndefFuture() }
 	| indef_duration { Duration() }
@@ -40,6 +41,10 @@ present -> "now"
     | "presently"
     | "present" "time"
     | "the" "present" "time"
+    
+anaphoric -> "then"
+    | "meanwhile"
+    | "that" "time"
     
 increment_or_decrement -> last_deictic "week" { Decrement(Week)(Deictic()) }
     | last_deictic "month" { Decrement(Month)(Deictic()) }
