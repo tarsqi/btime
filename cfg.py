@@ -7,11 +7,6 @@ import re
 import sys
 from types import FunctionType
 
-# Russell 6-29: These classes all expect "word/POS" tokens as their input
-# for matching purposes. Make this look nicer later?
-
-input_regexp = r'^(.+)/([^\d]+)$'
-
 class Terminal(object):
     """Terminal objects are used to match input tokens. Subclasses should
     override the match method, which takes a token and returns true if that
@@ -26,27 +21,13 @@ class Literal(Terminal):
 
     def match(self, token):
         if not isinstance(token, basestring): return False
-        return token and self.lit == unicode(token_word(token)).lower()
+        return token and self.lit == unicode(token).lower()
 
     def __repr__(self):
         return "Literal(%r)" % self.lit
 
     def __str__(self):
         return self.lit
-
-class POSTerminal(Terminal):
-    def __init__(self, pos):
-        self.pos = unicode(pos[1:])
-
-    def match(self, token):
-        if not isinstance(token, basestring): return False
-        return token and self.pos == unicode(token_pos(token))
-
-    def __repr__(self):
-        return "PartOfSpeech(%r)" % self.pos
-
-    def __str__(self):
-        return self.pos
 
 class RegexpTerminal(Terminal):
     def __init__(self, pattern, name=None, flags=re.UNICODE):
@@ -56,7 +37,7 @@ class RegexpTerminal(Terminal):
     def match(self, token):
         if not isinstance(token, basestring): return False
         return token is not None and \
-               self.pattern.match(unicode(token_word(token.lower())))
+               self.pattern.match(unicode(token.lower()))
 
     def __str__(self):
         return self.name
@@ -74,7 +55,7 @@ class Acronym(Terminal):
             raise ValueError("invalid acronym: %s" % acronym)
 
     def match(self, token):
-        return token_word(token) in self.acronym
+        return token in self.acronym
 
 class Abbrev(Terminal):
     def __init__(self, string, min_prefix_len):
@@ -86,24 +67,9 @@ class Abbrev(Terminal):
 
     def match(self, token):
         if not isinstance(token, basestring): return False
-        string = unicode(token_word(token.lower()))
+        string = unicode(token.lower())
         return (len(string) >= self.min and
                 self.string.startswith(string.rstrip(".")))
-
-class WordPOSTerminal(Terminal):
-    def __init__(self, word, pos):
-        self.word = word
-        self.pos = pos
-
-class WordAndPOS(WordPOSTerminal):
-    def match(self, token):
-        return token and self.word == unicode(token_word(token)) and \
-                         self.pos == unicode(token_pos(token))
-
-class WordNotPOS(WordPOSTerminal):
-    def match(self, token):
-        return token and self.word == unicode(token_word(token)) and \
-                         not self.pos == unicode(token_pos(token))
 
 class Production(object):
     """A production rule consists of a left-hand side (LHS) and a
@@ -204,16 +170,3 @@ class ParseTree(object):
         return (isinstance(other, ParseTree) and
                 self.node == other.node and
                 self.children == other.children)
-
-def token_word(token):
-    if not isinstance(token, basestring): token = str(token)
-    match = re.match(input_regexp, token)
-    if match: return match.group(1)
-    else: return token # allows things to (mostly) still work for
-                       # untagged tokens
-
-def token_pos(token):
-    if not isinstance(token, basestring): token = str(token)
-    match = re.match(input_regexp, token)
-    if match: return match.group(2)
-    else: return None

@@ -6,7 +6,6 @@ from cfg import *
 from earley import Parser
 from grammarparser import parse_grammar_spec
 from iso8601 import *
-from read_tml import *
 
 # Terminals for the timex grammar.
 
@@ -81,7 +80,7 @@ class Exact(Terminal):
     
     def match(self, token):
         if not isinstance(token, basestring): return False
-        return token and self.lit == unicode(token_word(token))
+        return token and self.lit == unicode(token)
 
 f = codecs.open('timex-grammar.txt', mode='r', encoding='UTF-8')
 raw = f.read()
@@ -103,27 +102,37 @@ class TemporalFunction(object):
                          self.__class__.__name__)
 
     def __str__(self):
-        return "%s()" % self.__class__.__name__.upper()
+        return "%s()" % self.__class__.__name__
 
 class PastRef(TemporalFunction): pass
 
 class FutureRef(TemporalFunction): pass
 
+class PresentRef(TemporalFunction): pass
+
 class AnchoredTimex(TemporalFunction):
-    def __init__(self, timex, anchor):
+    def __init__(self, timex, tid, anchor_tid):
         self.timex = timex
-        self.anchor = anchor
+        self.tid = tid
+        self.anchor_tid = anchor_tid
 
     def __str__(self):
-        return "(%s)ANCHORED_BY(%s)" % (self.timex, self.anchor)
+        return "%s(%s, %s, %s)" % (self.__class__.__name__,
+                                   self.timex,
+                                   self.tid,
+                                   self.anchor_tid)
+
+class BeginAnchoredTimex(AnchoredTimex): pass
+
+class EndAnchoredTimex(AnchoredTimex): pass
 
 class Anchor(TemporalFunction):
     def __call__(self, anchor):
         return anchor
 
-class Deictic(Anchor): pass
+class UtteranceTime(Anchor): pass
 
-class Anaphoric(Anchor): pass
+class ReferenceTime(Anchor): pass
 
 class AnchoredInterval(TemporalFunction):
     def __call__(self, anchor):
@@ -134,19 +143,18 @@ class AnchoredInterval(TemporalFunction):
         self.duration = duration
         self.anchor = None
 
-class PastAnchoredInterval(AnchoredInterval, PastRef):
     def __str__(self):
         if self.anchor:
-            return "THE_PAST(%s)BEFORE(%s)" % (self.duration, self.anchor)
+            return "%s(%s)(%s)" % (self.__class__.__name__,
+                                   self.duration,
+                                   self.anchor)
         else:
-            return "THE_PAST(%s)" % self.duration
+            return "%s(%s)" % (self.__class__.__name__,
+                               self.duration)
 
-class FutureAnchoredInterval(AnchoredInterval, FutureRef):
-    def __str__(self):
-        if self.anchor:
-            return "THE_NEXT(%s)AFTER(%s)" % (self.duration, self.anchor)
-        else:
-            return "THE_NEXT(%s)" % self.duration
+class PastAnchoredInterval(AnchoredInterval, PastRef): pass
+
+class FutureAnchoredInterval(AnchoredInterval, FutureRef): pass
 
 class IndefReference(TemporalFunction):
     def __init__(self):
@@ -156,24 +164,18 @@ class IndefReference(TemporalFunction):
         self.anchor = anchor
         return self
 
-class IndefPast(IndefReference, PastRef): 
-    def __str__(self):
-        return "INDEF_PAST"
+class IndefPast(IndefReference, PastRef): pass
 
-class IndefFuture(IndefReference, FutureRef): 
-    def __str__(self):
-        return "INDEF_FUTURE"
+class IndefFuture(IndefReference, FutureRef): pass
 
-class IndefTimePoint(IndefReference):
-    def __str__(self):
-        return "INDEF_TIMEPOINT"
+class IndefTimePoint(IndefReference): pass
 
 class GenericPlural(TemporalFunction):
     def __init__(self, unit):
         self.unit = unit
 
     def __str__(self):
-        return "SOME(%s)" % self.unit.__name__
+        return "%s(%s)" % (self.__class__.__name__, self.unit.__name__)
 
 class AnchoredTimePoint(TemporalFunction):
     def __call__(self, anchor):
@@ -187,19 +189,18 @@ class AnchoredTimePoint(TemporalFunction):
         self.duration = duration
         self.anchor = None
 
-class PastAnchoredTimePoint(AnchoredTimePoint, PastRef):
     def __str__(self):
         if self.anchor:
-            return "(%s)BEFORE(%s)" % (self.duration, self.anchor)
+            return "%s(%s)(%s)" % (self.__class__.__name__,
+                                   self.duration,
+                                   self.anchor)
         else:
-            return "(%s)EARLIER" % self.duration
+            return "%s(%s)" % (self.__class__.__name__,
+                               self.duration)
 
-class FutureAnchoredTimePoint(AnchoredTimePoint, FutureRef):
-    def __str__(self):
-        if self.anchor:
-            return "(%s)AFTER(%s)" % (self.duration, self.anchor)
-        else:
-            return "(%s)LATER" % self.duration
+class PastAnchoredTimePoint(AnchoredTimePoint, PastRef): pass
+
+class FutureAnchoredTimePoint(AnchoredTimePoint, FutureRef): pass
 
 class IncrementOrDecrement(TemporalFunction):
     def __call__(self, anchor):
@@ -213,19 +214,18 @@ class IncrementOrDecrement(TemporalFunction):
         self.unit = unit
         self.anchor = None
 
-class Decrement(IncrementOrDecrement, PastRef):
     def __str__(self):
         if self.anchor:
-            return "(%s)DECREMENTED_BY(%s)" % (self.anchor, self.unit.__name__)
+            return "%s(%s)(%s)" % (self.__class__.__name__,
+                                   self.unit.__name__,
+                                   self.anchor)
         else:
-            return "DECREMENT_BY(%s)" % self.unit.__name__
+            return "%s(%s)" % (self.__class__.__name__,
+                               self.unit.__name__)
 
-class Increment(IncrementOrDecrement, FutureRef):
-    def __str__(self):
-        if self.anchor:
-            return "(%s)INCREMENTED_BY(%s)" % (self.anchor, self.unit.__name__)
-        else:
-            return "INCREMENT_BY(%s)" % self.unit.__name__
+class Decrement(IncrementOrDecrement, PastRef): pass
+
+class Increment(IncrementOrDecrement, FutureRef): pass
 
 class NextOrLastInstance(TemporalFunction):
     def __call__(self, anchor):
@@ -239,37 +239,28 @@ class NextOrLastInstance(TemporalFunction):
         self.timepoint = timepoint
         self.anchor = None
 
-class NextInstance(NextOrLastInstance, FutureRef):
     def __str__(self):
         if self.anchor:
-            return "NEXT(%s)AFTER(%s)" % (self.timepoint, self.anchor)
+            return "%s(%s)(%s)" % (self.__class__.__name__,
+                                   self.timepoint,
+                                   self.anchor)
         else:
-            return "NEXT_INSTANCE_OF(%s)" % self.timepoint
+            return "%s(%s)" % (self.__class__.__name__,
+                               self.timepoint)
 
-class LastInstance(NextOrLastInstance, PastRef):
-    def __str__(self):
-        if self.anchor:
-            return "LAST(%s)BEFORE(%s)" % (self.timepoint, self.anchor)
-        else:
-            return "LAST_INSTANCE_OF(%s)" % self.timepoint    
+class NextInstance(NextOrLastInstance, FutureRef): pass
+
+class LastInstance(NextOrLastInstance, PastRef): pass   
 
 class CoercedTimePoint(TemporalFunction):
     def __init__(self, timepoint, unit):
         self.timepoint = timepoint
         self.unit = unit
 
-    def __call__(self, anchor):
-        if isinstance(self.timepoint, TemporalFunction):
-            self.timepoint = self.timepoint(anchor)
-        else:
-            self.timepoint = anchor
-        return self
-
     def __str__(self):
-        if not isinstance(self.unit, (iso8601.TimeUnit, iso8601.Duration)):
-            return "(%s)_AS_%s" % (self.timepoint, self.unit.__name__)
-        else:
-            return "(%s)_AS_%s" % (self.timepoint, repr(self.unit))
+        return "%s(%s, %s)" % (self.__class__.__name__,
+                               self.timepoint,
+                               self.unit.__name__)
 
 class TemporalModifier(TemporalFunction):
     def __init__(self, modifier, timex):
@@ -277,18 +268,15 @@ class TemporalModifier(TemporalFunction):
         self.timex = timex
 
     def __str__(self):
-        return "%s(%s)" % (self.modifier.upper(), self.timex)
+        return "%s(%s, %s)" % (self.__class__.__name__,
+                               self.modifier,
+                               self.timex)
 
 class Mod(TemporalModifier): pass
 
-class Freq(TemporalModifier): 
-    def __str__(self):
-        return '%sx_PER(%s)' % (self.modifier, self.timex)
+class Freq(TemporalModifier): pass
 
-class Quant(TemporalModifier):
-    def __init__(self, modifier, timex):
-        self.modifier = token_word(modifier)
-        self.timex = timex
+class Quant(TemporalModifier): pass
 
 class DoNotParse(object):
     """In the grammar, you can use this class to modify objects (i.e.
@@ -377,7 +365,8 @@ def anchored(timex):
 
 def anchor_type(timex):
     if isinstance(timex, Anchor): return type(timex)
-    elif isinstance(timex, TemporalModifier): return anchor_type(timex.timex)
+    elif isinstance(timex, TemporalModifier):
+        return anchor_type(timex.timex)
     elif isinstance(timex, TemporalFunction):
         try:
             return anchor_type(timex.anchor)
@@ -394,10 +383,11 @@ def timex_type(timex):
     else: return type(timex)
 
 def granularity(timex):
-    if timex.__module__ == 'iso8601.iso8601':
+    if not timex: return None
+    elif timex.__module__ == 'iso8601.iso8601':
         cls = None
         if isinstance(timex, Duration):
-            for unit in timex.elements:
+            for unit in timex.elements[::-1]:
                 if unit.value:
                     cls = type(unit)
                     break

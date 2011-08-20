@@ -1,5 +1,5 @@
-timex -> present { Deictic() } 
-    | anaphoric { Anaphoric() }
+timex -> present { UtteranceTime() } 
+    | reference_time { ReferenceTime() }
     | indef_past { IndefPast() }
 	| indef_future { IndefFuture() }
 	| indef_duration { Duration() }
@@ -42,41 +42,41 @@ present -> "now"
     | "present" "time"
     | "the" "present" "time"
     
-anaphoric -> "then"
+reference_time -> "then"
     | "meanwhile"
     | "that" "time"
     
-increment_or_decrement -> last_deictic "week" { Decrement(Week)(Deictic()) }
-    | last_deictic "month" { Decrement(Month)(Deictic()) }
-    | last_deictic "year" { Decrement(Year)(Deictic()) }
-    | next_deictic "week" { Increment(Week)(Deictic()) }
-    | next_deictic "month" { Increment(Month)(Deictic()) }
-    | next_deictic "year" { Increment(Year)(Deictic()) }
-    | last_anaphoric "week" { Decrement(Week)(Anaphoric()) }
-    | last_anaphoric "month" { Decrement(Month)(Anaphoric()) }
-    | last_anaphoric "year" { Decrement(Year)(Anaphoric()) }
-    | next_anaphoric "week" { Increment(Week)(Anaphoric()) }
-    | next_anaphoric "month" { Increment(Month)(Anaphoric()) }
-    | next_anaphoric "year" { Increment(Year)(Anaphoric()) }
-    | "yesterday" { Decrement(Day)(Deictic()) }
-    | "tomorrow" { Increment(Day)(Deictic()) }
+increment_or_decrement -> last_utterance_time "week" { Decrement(Week)(UtteranceTime()) }
+    | last_utterance_time "month" { Decrement(Month)(UtteranceTime()) }
+    | last_utterance_time "year" { Decrement(Year)(UtteranceTime()) }
+    | next_utterance_time "week" { Increment(Week)(UtteranceTime()) }
+    | next_utterance_time "month" { Increment(Month)(UtteranceTime()) }
+    | next_utterance_time "year" { Increment(Year)(UtteranceTime()) }
+    | last_reference_time "week" { Decrement(Week)(ReferenceTime()) }
+    | last_reference_time "month" { Decrement(Month)(ReferenceTime()) }
+    | last_reference_time "year" { Decrement(Year)(ReferenceTime()) }
+    | next_reference_time "week" { Increment(Week)(ReferenceTime()) }
+    | next_reference_time "month" { Increment(Month)(ReferenceTime()) }
+    | next_reference_time "year" { Increment(Year)(ReferenceTime()) }
+    | "yesterday" { Decrement(Day)(UtteranceTime()) }
+    | "tomorrow" { Increment(Day)(UtteranceTime()) }
     
-next_or_last_instance -> last_deictic timepoint { LastInstance(_[1])(Deictic()) }
-    | next_deictic timepoint { NextInstance(_[1])(Deictic()) }
+next_or_last_instance -> last_utterance_time timepoint { LastInstance(_[1])(UtteranceTime()) }
+    | next_utterance_time timepoint { NextInstance(_[1])(UtteranceTime()) }
 
-coerced_timepoint -> "today" { CoercedTimePoint(Deictic(), Day) }
-    | "this" bare_unit { CoercedTimePoint(Deictic(), _[1]) }
-    | "the" "current" bare_unit { CoercedTimePoint(Deictic(), _[2]) }
-    | "this" month { CoercedTimePoint(Deictic(), _[1]) }
-    | "this" day_of_week { CoercedTimePoint(Deictic(), _[1]) }
+coerced_timepoint -> "today" { CoercedTimePoint(UtteranceTime(), Day) }
+    | "this" bare_unit { CoercedTimePoint(UtteranceTime(), _[1]) }
+    | "the" "current" bare_unit { CoercedTimePoint(UtteranceTime(), _[2]) }
+    | "this" month { CoercedTimePoint(UtteranceTime(), _[1]) }
+    | "this" day_of_week { CoercedTimePoint(UtteranceTime(), _[1]) }
 
-last_deictic -> "last"
+last_utterance_time -> "last"
 
-next_deictic -> "next" | "this" "coming"
+next_utterance_time -> "next" | "this" "coming"
 
-last_anaphoric -> "the" "latest" | "the" "most" "recent" | "the" "earlier"
+last_reference_time -> "the" "latest" | "the" "most" "recent" | "the" "earlier"
 
-next_anaphoric -> "the" "following" | "the" "coming"
+next_reference_time -> "the" "following" | "the" "coming"
 
 time -> named_hour { Time(_[0]) }
     | hour ":" minute { Time(_[0], _[2]) }
@@ -154,13 +154,13 @@ year_and_week -> ordinal "week" "of" year { Year(_[3]) | Week(_[0]) }
 year_and_day -> ordinal "day" "of" year { Year(_[3]) | Day(_[0]) }
     | "the" ordinal "day" "of" year { Year(_[4]) | Day(_[1]) }
 
-day_of_week -> Abbrev("monday", 3) { DayOfWeek(1) }
-    | Abbrev("tuesday", 3) { DayOfWeek(2) }
-    | Abbrev("wednesday", 3) { DayOfWeek(3) }
-    | Abbrev("thursday", 3) { DayOfWeek(4) }
-    | Abbrev("friday", 3) { DayOfWeek(5) }
-    | Abbrev("saturday", 3) { DayOfWeek(6) }
-    | Abbrev("sunday", 3) { DayOfWeek(7) }
+day_of_week -> Abbrev("sunday", 3) { DayOfWeek(1) }
+    | Abbrev("monday", 3) { DayOfWeek(2) }
+    | Abbrev("tuesday", 3) { DayOfWeek(3) }
+    | Abbrev("wednesday", 3) { DayOfWeek(4) }
+    | Abbrev("thursday", 3) { DayOfWeek(5) }
+    | Abbrev("friday", 3) { DayOfWeek(6) }
+    | Abbrev("saturday", 3) { DayOfWeek(7) }
 
 interval -> anchored_interval | duration
 
@@ -169,9 +169,9 @@ anchored_interval -> "the" "past" duration { PastAnchoredInterval(_[2]) }
     | "the" "next" duration { FutureAnchoredInterval(_[2]) }
     | "the" "coming" duration { FutureAnchoredInterval(_[2]) }
     
-anchored_timepoint -> duration "ago" { PastAnchoredTimePoint(_[0])(Deictic()) }
-    | duration "earlier" { PastAnchoredTimePoint(_[0])(Anaphoric()) }
-    | duration "afterwards" { FutureAnchoredTimePoint(_[0])(Anaphoric()) }
+anchored_timepoint -> duration "ago" { PastAnchoredTimePoint(_[0])(UtteranceTime()) }
+    | duration "earlier" { PastAnchoredTimePoint(_[0])(ReferenceTime()) }
+    | duration "afterwards" { FutureAnchoredTimePoint(_[0])(ReferenceTime()) }
     | duration "later" { FutureAnchoredTimePoint(_[0]) }
 
 duration -> period { Duration() | _[0] }
@@ -240,7 +240,7 @@ small -> small_num
 ones -> "one" { 1 }
     | "two" { 2 }
     | "three" { 3 }
-    | "four" { 4}
+    | "four" { 4 }
     | "five" { 5 }
     | "six" { 6 }
     | "seven" { 7 }
@@ -443,14 +443,14 @@ indef_timepoint -> demonstr r"times?"
     | dt_any r"moments?"
     | dem_any r"moments?"
     
-wsj_expression -> unit_ago "period" { PastAnchoredTimePoint(Duration() | _[0](1))(Deictic()) }
-    | unit_earlier "period" { PastAnchoredTimePoint(Duration() | _[0](1))(Anaphoric()) }
-    | unit_ago bare_unit { CoercedTimePoint(PastAnchoredTimePoint(Duration() | _[0](1))(Deictic()), _[1]) }
-    | unit_earlier bare_unit { CoercedTimePoint(PastAnchoredTimePoint(Duration() | _[0](1))(Anaphoric()), _[1]) }
+wsj_expression -> unit_ago "period" { PastAnchoredTimePoint(Duration() | _[0](1))(UtteranceTime()) }
+    | unit_earlier "period" { PastAnchoredTimePoint(Duration() | _[0](1))(ReferenceTime()) }
+    | unit_ago bare_unit { CoercedTimePoint(PastAnchoredTimePoint(Duration() | _[0](1))(UtteranceTime()), _[1]) }
+    | unit_earlier bare_unit { CoercedTimePoint(PastAnchoredTimePoint(Duration() | _[0](1))(ReferenceTime()), _[1]) }
     | dt_any wsj_expression { _[1] }
     | dem_any wsj_expression { _[1] }
-    | unit_ago { PastAnchoredTimePoint(Duration() | _[0](1))(Deictic()) }
-    | unit_earlier { PastAnchoredTimePoint(Duration() | _[0](1))(Anaphoric()) }
+    | unit_ago { PastAnchoredTimePoint(Duration() | _[0](1))(UtteranceTime()) }
+    | unit_earlier { PastAnchoredTimePoint(Duration() | _[0](1))(ReferenceTime()) }
     
 unit_ago -> bare_unit "ago" { _[0] }
     | bare_unit "-" "ago" { _[0] }
@@ -476,10 +476,10 @@ generic_plural -> "seconds" { GenericPlural(Seconds) }
     
 do_not_parse -> small_num "years" "old" { DoNotParse(map(str, _)) }
     
-adj_phrase -> adj
-    | adj_phrase adj
-    | adj adj_phrase
-    | adv adj
+adj_phrase -> Other()
+    | adj_phrase Other()
+    | Other() adj_phrase
+    | adv Other()
 
 some -> "some"
     | "few"
@@ -489,18 +489,14 @@ some -> "some"
     | "couple" "of"
     | "several"
 
-adj -> "/jj"
-
-adv -> "/rb"
-    | "very"
+adv -> "very"
     | "most"
     | "least"
     | "more"
     | "less"
     | r".*ly$"
     
-dt -> "/dt"
-    | "a"
+dt -> "a"
     | "an"
     | "the"
     
@@ -511,5 +507,3 @@ dem_any -> demonstr | demonstr Any() | demonstr adv Any()
 dt_any -> dt | dt Any() | dt adv Any()
 
 the_any -> "the" | "the" Any() | "the" adv Any()
-
-modal -> "/md"
