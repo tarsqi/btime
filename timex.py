@@ -360,6 +360,27 @@ def parse(tokens, grammar=read_timex_grammar()):
         except StopIteration:
             yield tokens.pop(0)
 
+def parse2(tokens, grammar=read_timex_grammar()):
+    """Another parse function, but now one that in addition to the token or parse
+    also returns how many tokens were consumed."""
+    tokens = list(tokens)
+    parser = Parser(grammar)
+    while tokens:
+        parser.parse(tokens)
+        try:
+            tree = parser.parses().next()
+            next_parse = parser.grammar.eval(tree)
+            if isinstance(next_parse, DoNotParse):
+                # not sure whether this is used, but leave a warning just in case
+                print "WARNING: we have a DoNotParse"
+                for p in next_parse():
+                    yield p
+            else:
+                yield (len(list(tree.leaves())), next_parse)
+            del tokens[0:len(list(tree.leaves()))]
+        except StopIteration:
+            yield (1, tokens.pop(0))
+
 def anchored(timex):
     return timex['anchorTimeID'] or timex['beginPoint'] or timex['endPoint']
 
